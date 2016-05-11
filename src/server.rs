@@ -72,7 +72,21 @@ impl web_session::Server for WebSession {
         let path = pry!(pry!(params.get()).get_path());
         pry!(self.require_canonical_path(path));
 
-        if path == "var" || path == "var/" {
+        println!("PATH {}", path);
+
+        if path == "" {
+            let text = "<!DOCTYPE html>\
+                       <html><head>\
+                       <script type=\"text/javascript\" src=\"script.js\" async></script>
+                       </head><body><div id=\"main\"></div></body></html>";
+            let mut content = results.get().init_content();
+            content.set_mime_type("text/html; charset=UTF-8");
+            content.init_body().set_bytes(text.as_bytes());
+            Promise::ok(())
+        } else if path == "script.js" {
+            println!("hi");
+            self.read_file("/script.js.gz", results, "text/javascript; charset=UTF-8", Some("gzip"))
+        } else if path == "var" || path == "var/" {
             // Return a listing of the directory contents, one per line.
             let mut entries = Vec::new();
             for entry in pry!(::std::fs::read_dir(path)) {
@@ -82,6 +96,7 @@ impl web_session::Server for WebSession {
                     entries.push(name);
                 }
             }
+
             let text = entries.join("\n");
             let mut response = results.get().init_content();
             response.set_mime_type("text/plain");
@@ -94,17 +109,11 @@ impl web_session::Server for WebSession {
             // it would only allow the attacker to hijack another user's access to this grain, not to
             // Sandstorm in general, and if they attacker already has write access to upload the
             // malicious content, they have little to gain from hijacking another session.)
-            self.read_file(path, results, "application/octet-stream")
-        } else if path == ".can-write" {
-            // Fetch "/.can-write" to determine if the user has write permission, so you can show them
-            // a different UI if not.
-            let mut response = results.get().init_content();
-            response.set_mime_type("text/plain");
-            response.init_body().set_bytes(&format!("{}", self.can_write).as_bytes());
-            Promise::ok(())
+            self.read_file(path, results, "application/octet-stream", None)
         } else if path == "" || path.ends_with("/") {
             // A directory. Serve "index.html".
-            self.read_file(&format!("client/{}index.html", path), results, "text/html; charset=UTF-8")
+            self.read_file(&format!("client/{}index.html", path), results, "text/html; charset=UTF-8",
+                           None)
         } else {
             // Request for a static file. Look for it under "client/".
             let filename = format!("client/{}", path);
@@ -119,7 +128,7 @@ impl web_session::Server for WebSession {
                 Promise::ok(())
             } else {
                 // Regular file (or non-existent).
-                self.read_file(&filename, results, self.infer_content_type(path))
+                self.read_file(&filename, results, self.infer_content_type(path), None)
             }
         }
     }
@@ -226,7 +235,8 @@ impl WebSession {
     fn read_file(&self,
                  filename: &str,
                  mut results: web_session::GetResults,
-                 content_type: &str)
+                 content_type: &str,
+                 encoding: Option<&str>)
                  -> Promise<(), Error>
     {
         match ::std::fs::File::open(filename) {
@@ -235,6 +245,8 @@ impl WebSession {
                 let mut content = results.get().init_content();
                 content.set_status_code(web_session::response::SuccessCode::Ok);
                 content.set_mime_type(content_type);
+                encoding.map(|enc| content.set_encoding(enc));
+
                 let mut body = content.init_body().init_bytes(size as u32);
                 pry!(::std::io::copy(&mut f, &mut body));
                 Promise::ok(())
