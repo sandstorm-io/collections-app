@@ -2,6 +2,69 @@ require("babel-polyfill");
 const React = require('react');
 const ReactDOM = require('react-dom');
 
+
+function http(url: string, postData?: string | Blob | Delete): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => {
+      if (xhr.status >= 400) {
+        reject(new Error("XHR returned status " + xhr.status + ":\n" + xhr.responseText));
+      } else {
+        resolve(xhr.responseText);
+      }
+    };
+    xhr.onerror = (e: Error) => { reject(e); };
+    if (postData instanceof Delete) {
+      xhr.open("delete", url)
+      xhr.send();
+    } else {
+      xhr.open(postData ? "post" : "get", url)
+      xhr.send(postData);
+    }
+  });
+}
+
+let rpcCounter = 0;
+const rpcs: { [key: number]: (response: mixed) => void } = {};
+
+window.addEventListener("message", (event) => {
+
+  console.log("w00t! got postmessage: " + JSON.stringify(event.data));
+
+  if (event.source !== window.parent ||
+      typeof event.data !== "object" ||
+      typeof event.data.rpcId !== "number") {
+    console.warn("got unexpected postMessage:", event);
+    return;
+  }
+
+  const handler = rpcs[event.data.rpcId];
+  if (!handler) {
+    console.error("no such rpc ID for event", event);
+    return;
+  }
+
+  delete rpcs[event.data.rpcId];
+  handler(event.data);
+});
+
+function sendRpc(name: string, message: Object): Promise<any> {
+  const id = rpcCounter++;
+  message.rpcId = id;
+  const obj = {};
+  obj[name] = message;
+  window.parent.postMessage(obj, "*");
+  return new Promise((resolve, reject) => {
+    rpcs[id] = (response) => {
+      if (response.error) {
+        reject(new Error(response.error));
+      } else {
+        resolve(response);
+      }
+    };
+  });
+}
+
 const interfaces = {
   // Powerbox descriptors for various interface IDs.
 
@@ -15,12 +78,11 @@ const interfaces = {
 };
 
 function doRequest(serializedPowerboxDescriptor) {
-  window.parent.postMessage({
-    powerboxRequest: {
-      rpcId: "1",
-      query: [serializedPowerboxDescriptor],
-    },
-  }, "*");
+  sendRpc("powerboxRequest", {
+    query: [serializedPowerboxDescriptor]
+  }).then((response) => {
+    console.log("response: " + JSON.stringify(response));
+  });
 }
 
 
@@ -50,7 +112,3 @@ ReactDOM.render(
   </div>,
   document.getElementById("main")
 );
-
-window.addEventListener('message', (event) => {
-  console.log("got postmessage: " + JSON.stringify(event.data));
-});
