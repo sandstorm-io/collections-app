@@ -28,9 +28,6 @@ let rpcCounter = 0;
 const rpcs: { [key: number]: (response: mixed) => void } = {};
 
 window.addEventListener("message", (event) => {
-
-  console.log("w00t! got postmessage: " + JSON.stringify(event.data));
-
   if (event.source !== window.parent ||
       typeof event.data !== "object" ||
       typeof event.data.rpcId !== "number") {
@@ -82,6 +79,7 @@ function doRequest(serializedPowerboxDescriptor) {
     query: [serializedPowerboxDescriptor]
   }).then((response) => {
     console.log("response: " + JSON.stringify(response));
+    return http("/token/" + response.token, response.descriptor);
   });
 }
 
