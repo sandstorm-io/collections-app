@@ -23,7 +23,7 @@ use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 
-use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session};
+use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, powerbox_descriptor};
 use sandstorm::web_session_capnp::{web_session};
 
 pub struct WebSession {
@@ -144,6 +144,39 @@ impl web_session::Server for WebSession {
         if path.starts_with("token/") {
             println!("token");
         }
+
+
+        let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
+
+        let decoded_content = match ::rustc_serialize::base64::FromBase64::from_base64(content) {
+            Ok(c) => c,
+            Err(_) => {
+                // XXX should return a 400 error
+                return Promise::err(Error::failed("failed to convert from base64".into()));
+            }
+        };
+        {
+            let mut cursor = ::std::io::Cursor::new(decoded_content);
+            let message = pry!(::capnp::serialize_packed::read_message(&mut cursor,
+                                                                       Default::default()));
+            let desc: powerbox_descriptor::Reader = pry!(message.get_root());
+            for tag in pry!(desc.get_tags()).iter() {
+                println!("tag {}", tag.get_id());
+                let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
+                println!("title: {}", pry!(value.get_title()));
+                let metadata = pry!(value.get_metadata());
+                match pry!(metadata.which()) {
+                    ::sandstorm::grain_capnp::denormalized_grain_metadata::Icon(icon) => {
+                        println!("icon with format {}", pry!(icon.get_format()))
+                    }
+                    ::sandstorm::grain_capnp::denormalized_grain_metadata::AppId(_) => {
+                        println!("appid");
+                    }
+                }
+            }
+        }
+
+        let mut _content = results.get().init_content();
         Promise::ok(())
     }
 

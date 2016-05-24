@@ -3,6 +3,8 @@ const React = require('react');
 const ReactDOM = require('react-dom');
 
 
+function Delete() {}
+
 function http(url: string, postData?: string | Blob | Delete): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
@@ -79,7 +81,9 @@ function doRequest(serializedPowerboxDescriptor) {
     query: [serializedPowerboxDescriptor]
   }).then((response) => {
     console.log("response: " + JSON.stringify(response));
-    return http("/token/" + response.token, response.descriptor);
+    return http("/token/" + response.token, response.descriptor).then((response) => {
+      console.log("OK");
+    });
   });
 }
 

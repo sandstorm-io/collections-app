@@ -23,6 +23,7 @@
 extern crate gjio;
 extern crate capnp;
 extern crate capnp_rpc;
+extern crate rustc_serialize;
 extern crate sandstorm;
 
 pub mod server;
