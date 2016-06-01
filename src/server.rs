@@ -24,16 +24,19 @@ use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, powerbox_descriptor};
+use sandstorm::grain_capnp::{sandstorm_api};
 use sandstorm::web_session_capnp::{web_session};
 
 pub struct WebSession {
     can_write: bool,
+    sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
 }
 
 impl WebSession {
     pub fn new(user_info: user_info::Reader,
                _context: session_context::Client,
-               _params: web_session::params::Reader)
+               _params: web_session::params::Reader,
+               sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
                -> ::capnp::Result<WebSession>
     {
         // Permission #0 is "write". Check if bit 0 in the PermissionSet is set.
@@ -42,6 +45,7 @@ impl WebSession {
 
         Ok(WebSession {
             can_write: can_write,
+            sandstorm_api: sandstorm_api,
         })
 
         // `UserInfo` is defined in `sandstorm/grain.capnp` and contains info like:
@@ -141,10 +145,15 @@ impl web_session::Server for WebSession {
         let path = pry!(pry!(params.get()).get_path());
         pry!(self.require_canonical_path(path));
 
-        if path.starts_with("token/") {
-            println!("token");
-        }
+        let token = if path.starts_with("token/") {
+            &path[6..]
+        } else {
+            let mut error = results.get().init_client_error();
+            error.set_status_code(web_session::response::ClientErrorCode::NotFound);
+            return Promise::ok(())
+        };
 
+        println!("token: {}", token);
 
         let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
 
@@ -176,8 +185,16 @@ impl web_session::Server for WebSession {
             }
         }
 
-        let mut _content = results.get().init_content();
-        Promise::ok(())
+        // now let's save this thing into an actual uiview sturdyref.
+        let mut req = self.sandstorm_api.restore_request();
+        req.get().set_token(token.as_bytes());
+        req.send().promise.then(move |response| {
+            let sealed_ui_view: ui_view::Client =
+                pry!(pry!(response.get()).get_cap().get_as_capability());
+            sealed_ui_view.get_view_info_request();
+            let mut _content = results.get().init_content();
+            Promise::ok(())
+        })
     }
 
     fn put(&mut self,
@@ -310,8 +327,17 @@ impl WebSession {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct UiView;
+pub struct UiView {
+    sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+}
+
+impl UiView {
+    fn new(client: sandstorm_api::Client<::capnp::any_pointer::Owned>) -> UiView {
+        UiView {
+            sandstorm_api: client,
+        }
+    }
+}
 
 impl ui_view::Server for UiView {
     fn get_view_info(&mut self,
@@ -361,7 +387,8 @@ impl ui_view::Server for UiView {
 
         let session = pry!(WebSession::new(pry!(params.get_user_info()),
                                            pry!(params.get_context()),
-                                           pry!(params.get_session_params().get_as())));
+                                           pry!(params.get_session_params().get_as()),
+                                           self.sandstorm_api.clone()));
         let client: web_session::Client =
             web_session::ToClient::new(session).from_server::<::capnp_rpc::Server>();
 
@@ -379,12 +406,18 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         // sandstorm launches us with a connection on file descriptor 3
 	    let stream = try!(unsafe { network.wrap_raw_socket_descriptor(3) });
 
-        let client = ui_view::ToClient::new(UiView).from_server::<::capnp_rpc::Server>();
+        let (p, f) = Promise::and_fulfiller();
+        let uiview = UiView::new(::capnp_rpc::new_promise_client(p));
+
+        let client = ui_view::ToClient::new(uiview).from_server::<::capnp_rpc::Server>();
         let network =
             twoparty::VatNetwork::new(stream.clone(), stream,
                                       rpc_twoparty_capnp::Side::Client, Default::default());
 
-	    let _rpc_system = RpcSystem::new(Box::new(network), Some(client.client));
+	    let mut rpc_system = RpcSystem::new(Box::new(network), Some(client.client));
+        let cap = rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
+            ::capnp_rpc::rpc_twoparty_capnp::Side::Server);
+        f.fulfill(cap.client);
         Promise::never_done().wait(wait_scope, &mut event_port)
     })
 }
