@@ -26,7 +26,6 @@ use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
 use sandstorm::web_session_capnp::{web_session};
-use sandstorm::app_capnp::metadata::icon;
 
 pub struct WebSession {
     can_write: bool,
@@ -192,17 +191,9 @@ impl web_session::Server for WebSession {
                 let title = pry!(view_info.get_app_title());
                 println!("title: {}", pry!(title.get_default_text()));
 
-                match pry!(pry!(view_info.get_app_grain_icon()).which()) {
-                    icon::Svg(svg) => {
-                        println!("SVG icon {}", pry!(svg));
-                    }
-                    icon::Png(png) => {
-                        println!("PNG icon");
-                    }
-                    icon::Unknown(()) => {
-                        println!("unknown format for icon");
-                    }
-                }
+                let urls = pry!(view_info.get_grain_icon_urls());
+                println!("URL1 {}", pry!(urls.get_url()));
+                println!("URL2 {}", pry!(urls.get_url2x_dpi()));
 
                 let mut req = sandstorm_api.save_request();
                 req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
