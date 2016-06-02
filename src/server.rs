@@ -23,8 +23,8 @@ use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 
-use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, powerbox_descriptor};
-use sandstorm::grain_capnp::{sandstorm_api};
+use sandstorm::powerbox_capnp::powerbox_descriptor;
+use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::app_capnp::metadata::icon;
 
@@ -174,53 +174,56 @@ impl web_session::Server for WebSession {
                 println!("tag {}", tag.get_id());
                 let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
                 println!("title: {}", pry!(value.get_title()));
-                let metadata = pry!(value.get_metadata());
-                match pry!(metadata.which()) {
-                    ::sandstorm::grain_capnp::denormalized_grain_metadata::Icon(icon) => {
-                        println!("icon with format {}", pry!(icon.get_format()))
-                    }
-                    ::sandstorm::grain_capnp::denormalized_grain_metadata::AppId(_) => {
-                        println!("appid");
-                    }
-                }
             }
         }
 
-        // (now let's save this thing into an actual uiview sturdyref (once claimRequest exists...))
-        let mut req = self.sandstorm_api.restore_request();
-        req.get().set_token(token.as_bytes());
-        req.send().promise.then(move |response| {
+        // now let's save this thing into an actual uiview sturdyref
+        let mut req = self.sandstorm_api.claim_request_request();
+        let sandstorm_api = self.sandstorm_api.clone();
+        req.get().set_request_token(token);
+        let do_stuff = req.send().promise.then(move |response| {
             println!("restored!");
             let sealed_ui_view: ui_view::Client =
                 pry!(pry!(response.get()).get_cap().get_as_capability());
             println!("got the cap!");
-            sealed_ui_view.get_view_info_request().send().promise.then_else(move |r| match r {
-                Ok(response) => {
-                    println!("got viewinfo");
-                    let view_info = pry!(response.get());
-                    let title = pry!(view_info.get_app_title());
-                    println!("title: {}", pry!(title.get_default_text()));
+            sealed_ui_view.get_view_info_request().send().promise.then(move |response| {
+                println!("got viewinfo");
+                let view_info = pry!(response.get());
+                let title = pry!(view_info.get_app_title());
+                println!("title: {}", pry!(title.get_default_text()));
 
-                    match pry!(pry!(view_info.get_app_grain_icon()).which()) {
-                        icon::Svg(svg) => {
-                            println!("SVG icon {}", pry!(svg));
-                        }
-                        icon::Png(png) => {
-                            println!("PNG icon");
-                        }
-                        icon::Unknown(()) => {
-                            println!("unknown format for icon");
-                        }
+                match pry!(pry!(view_info.get_app_grain_icon()).which()) {
+                    icon::Svg(svg) => {
+                        println!("SVG icon {}", pry!(svg));
                     }
-                    let mut _content = results.get().init_content();
-                    Promise::ok(())
+                    icon::Png(png) => {
+                        println!("PNG icon");
+                    }
+                    icon::Unknown(()) => {
+                        println!("unknown format for icon");
+                    }
                 }
-                Err(e) => {
-                    println!("ERROR: {:?}", e);
-                    let mut _content = results.get().init_content();
-                    Promise::ok(())
+
+                let mut req = sandstorm_api.save_request();
+                req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+                {
+                    let mut save_label = req.get().init_label();
+                    save_label.set_default_text("elephant");
                 }
+                req.send().promise.map(|_| Ok(()))
             })
+        });
+
+        do_stuff.then_else(move |r| match r {
+            Ok(()) => {
+                let mut _content = results.get().init_content();
+                Promise::ok(())
+            }
+            Err(e) => {
+                let mut error = results.get().init_client_error();
+                error.set_description_html(&format!("error: {:?}", e));
+                Promise::ok(())
+            }
         })
     }
 
