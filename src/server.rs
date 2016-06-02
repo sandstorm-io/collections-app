@@ -26,6 +26,7 @@ use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, powerbox_descriptor};
 use sandstorm::grain_capnp::{sandstorm_api};
 use sandstorm::web_session_capnp::{web_session};
+use sandstorm::app_capnp::metadata::icon;
 
 pub struct WebSession {
     can_write: bool,
@@ -185,15 +186,41 @@ impl web_session::Server for WebSession {
             }
         }
 
-        // now let's save this thing into an actual uiview sturdyref.
+        // (now let's save this thing into an actual uiview sturdyref (once claimRequest exists...))
         let mut req = self.sandstorm_api.restore_request();
         req.get().set_token(token.as_bytes());
         req.send().promise.then(move |response| {
+            println!("restored!");
             let sealed_ui_view: ui_view::Client =
                 pry!(pry!(response.get()).get_cap().get_as_capability());
-            sealed_ui_view.get_view_info_request();
-            let mut _content = results.get().init_content();
-            Promise::ok(())
+            println!("got the cap!");
+            sealed_ui_view.get_view_info_request().send().promise.then_else(move |r| match r {
+                Ok(response) => {
+                    println!("got viewinfo");
+                    let view_info = pry!(response.get());
+                    let title = pry!(view_info.get_app_title());
+                    println!("title: {}", pry!(title.get_default_text()));
+
+                    match pry!(pry!(view_info.get_app_grain_icon()).which()) {
+                        icon::Svg(svg) => {
+                            println!("SVG icon {}", pry!(svg));
+                        }
+                        icon::Png(png) => {
+                            println!("PNG icon");
+                        }
+                        icon::Unknown(()) => {
+                            println!("unknown format for icon");
+                        }
+                    }
+                    let mut _content = results.get().init_content();
+                    Promise::ok(())
+                }
+                Err(e) => {
+                    println!("ERROR: {:?}", e);
+                    let mut _content = results.get().init_content();
+                    Promise::ok(())
+                }
+            })
         })
     }
 
