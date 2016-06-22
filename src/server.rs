@@ -27,6 +27,31 @@ use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
 use sandstorm::grain_capnp::denormalized_grain_metadata;
 use sandstorm::web_session_capnp::{web_session};
+use sandstorm::web_session_capnp::web_session::web_socket_stream;
+
+pub struct WebSocketStream {
+    client_stream: web_socket_stream::Client,
+}
+
+impl WebSocketStream {
+    fn new(client_stream: web_socket_stream::Client) -> WebSocketStream {
+        WebSocketStream {
+            client_stream: client_stream,
+        }
+    }
+}
+
+impl web_socket_stream::Server for WebSocketStream {
+    fn send_bytes(&mut self,
+                  params: web_socket_stream::SendBytesParams,
+                  _results: web_socket_stream::SendBytesResults)
+                  -> Promise<(), Error>
+    {
+        let message = pry!(pry!(params.get()).get_message());
+        println!("websocket message {:?}", message);
+        Promise::ok(())
+    }
+}
 
 pub struct WebSession {
     can_write: bool,
@@ -289,6 +314,20 @@ impl web_session::Server for WebSession {
             results.get().init_no_content();
             Promise::ok(())
         }
+    }
+
+    fn open_web_socket(&mut self,
+                     params: web_session::OpenWebSocketParams,
+                     mut results: web_session::OpenWebSocketResults)
+                     -> Promise<(), Error>
+    {
+        println!("open web socket!");
+        let client_stream = pry!(pry!(params.get()).get_client_stream());
+
+        results.get().set_server_stream(
+            web_socket_stream::ToClient::new(
+                WebSocketStream::new(client_stream)).from_server::<::capnp_rpc::Server>());
+        Promise::ok(())
     }
 }
 
