@@ -8,6 +8,7 @@ proc/cpuinfo
 sandstorm-manifest
 script.js.gz
 server
+style.css.gz
 usr/lib64/ld-2.22.so
 usr/lib64/ld-linux-x86-64.so.2
 usr/lib64/libc-2.22.so

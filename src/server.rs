@@ -113,6 +113,7 @@ impl web_session::Server for WebSession {
         if path == "" {
             let text = "<!DOCTYPE html>\
                        <html><head>\
+                       <link rel=\"stylesheet\" type=\"text/css\" href=\"style.css\">\
                        <script type=\"text/javascript\" src=\"script.js\" async></script>
                        </head><body><div id=\"main\"></div></body></html>";
             let mut content = results.get().init_content();
@@ -120,8 +121,9 @@ impl web_session::Server for WebSession {
             content.init_body().set_bytes(text.as_bytes());
             Promise::ok(())
         } else if path == "script.js" {
-            println!("hi");
             self.read_file("/script.js.gz", results, "text/javascript; charset=UTF-8", Some("gzip"))
+        } else if path == "style.css" {
+            self.read_file("/style.css.gz", results, "text/css; charset=UTF-8", Some("gzip"))
         } else if path == "var" || path == "var/" {
             // Return a listing of the directory contents, one per line.
             let mut entries = Vec::new();
@@ -354,7 +356,7 @@ impl WebSession {
             }
         }
         Ok(())
-  }
+    }
 
     fn infer_content_type(&self, filename: &str) -> &'static str {
         if filename.ends_with(".html") {

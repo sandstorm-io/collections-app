@@ -1,4 +1,4 @@
-SPK_DEPS=spk/server spk/script.js.gz
+SPK_DEPS=spk/server spk/script.js.gz spk/style.css.gz
 
 .PHONY: dev clean
 

@@ -140,7 +140,33 @@ ReactDOM.render(
   <div><h1>Collections</h1>
     <main>
       <AddGrain/>
-      <OpenWebSocket/>
+    <OpenWebSocket/>
+
+    <div className="grain-list">
+    <table className="grain-list-table">
+      <thead>
+        <tr>
+            <td className="select-all-grains">
+              <input type="checkbox"/>
+            </td>
+            <td className="td-app-icon"></td>
+            <td className="grain-name">Name</td>
+            <td className="last-used">Last activity</td>
+            <td className="shared-or-owned">Mine/Shared</td>
+      </tr>
+      </thead>
+    <tbody>
+     <tr className="grain">
+      <td>
+    </td>
+    <td>
+    hi
+    </td>
+      </tr>
+    </tbody>
+    </table>
+   </div>
+
     </main>
   </div>,
   document.getElementById("main")
