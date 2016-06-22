@@ -22,6 +22,11 @@
 use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
+use rustc_serialize::base64;
+
+use std::collections::hash_map::HashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
@@ -57,9 +62,68 @@ impl web_socket_stream::Server for WebSocketStream {
     }
 }
 
+struct SavedUiViewData {
+    title: String,
+}
+
+pub struct SavedUiViewSet {
+    base_path: ::std::path::PathBuf,
+    views: HashMap<String, SavedUiViewData>,
+}
+
+impl SavedUiViewSet {
+    pub fn new<P>(token_directory: P) -> ::std::io::Result<SavedUiViewSet>
+        where P: AsRef<::std::path::Path>
+    {
+        use std::io::Read;
+
+        // create token directory if it does not yet exist
+        try!(::std::fs::create_dir_all(&token_directory));
+
+        let mut map = HashMap::new();
+
+        for token_file in try!(::std::fs::read_dir(&token_directory)) {
+            let dir_entry = try!(token_file);
+            let token: String = match dir_entry.file_name().to_str() {
+                None => {
+                    println!("malformed token: {:?}", dir_entry.file_name());
+                    continue
+                }
+                Some(s) => s.into(),
+            };
+
+            let mut reader = try!(::std::fs::File::open(dir_entry.path()));
+            let mut title = String::new();
+            try!(reader.read_to_string(&mut title));
+
+            map.insert(token,
+                       SavedUiViewData { title: title });
+        }
+
+        Ok(SavedUiViewSet {
+            base_path: token_directory.as_ref().to_path_buf(),
+            views: map,
+        })
+    }
+
+    fn insert(&mut self, binary_token: &[u8], title: String) -> ::std::io::Result<()> {
+        use std::io::Write;
+        let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
+        let mut token_path = ::std::path::PathBuf::new();
+        token_path.push(self.base_path.clone());
+        token_path.push(token.clone());
+        let mut writer = try!(::std::fs::File::create(token_path));
+        try!(writer.write_all(title.as_bytes()));
+        self.views.insert(token,
+                          SavedUiViewData { title: title });
+        Ok(())
+    }
+}
+
 pub struct WebSession {
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
     static_asset_path: String,
 }
 
@@ -67,7 +131,8 @@ impl WebSession {
     pub fn new(user_info: user_info::Reader,
                _context: session_context::Client,
                params: web_session::params::Reader,
-               sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
+               sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+               saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
                -> ::capnp::Result<WebSession>
     {
         // Permission #0 is "write". Check if bit 0 in the PermissionSet is set.
@@ -77,6 +142,7 @@ impl WebSession {
         Ok(WebSession {
             can_write: can_write,
             sandstorm_api: sandstorm_api,
+            saved_ui_views: saved_ui_views,
             static_asset_path: try!(params.get_static_asset_path()).into(),
         })
 
@@ -191,13 +257,14 @@ impl web_session::Server for WebSession {
 
         let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
 
-        let decoded_content = match ::rustc_serialize::base64::FromBase64::from_base64(content) {
+        let decoded_content = match base64::FromBase64::from_base64(content) {
             Ok(c) => c,
             Err(_) => {
                 // XXX should return a 400 error
                 return Promise::err(Error::failed("failed to convert from base64".into()));
             }
         };
+        let mut grain_title: String = String::new();
         {
             let mut cursor = ::std::io::Cursor::new(decoded_content);
             let message = pry!(::capnp::serialize_packed::read_message(&mut cursor,
@@ -206,7 +273,9 @@ impl web_session::Server for WebSession {
             for tag in pry!(desc.get_tags()).iter() {
                 println!("tag {}", tag.get_id());
                 let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
-                println!("title: {}", pry!(value.get_title()));
+                grain_title = pry!(value.get_title()).into();
+                println!("title: {}", grain_title);
+
             }
         }
 
@@ -215,6 +284,7 @@ impl web_session::Server for WebSession {
         let sandstorm_api = self.sandstorm_api.clone();
         req.get().set_request_token(token);
         let static_asset_path = self.static_asset_path.clone();
+        let saved_ui_views = self.saved_ui_views.clone();
         let do_stuff = req.send().promise.then(move |response| {
             println!("restored!");
             let sealed_ui_view: ui_view::Client =
@@ -243,9 +313,13 @@ impl web_session::Server for WebSession {
                 req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
                 {
                     let mut save_label = req.get().init_label();
-                    save_label.set_default_text("elephant");
+                    save_label.set_default_text("[save label chosen by collections app]");
                 }
-                req.send().promise.map(|_| Ok(()))
+                req.send().promise.map(move |response| {
+                    let token = try!(try!(response.get()).get_token());
+                    try!(saved_ui_views.borrow_mut().insert(token, grain_title));
+                    Ok(())
+                })
             })
         });
 
@@ -413,12 +487,16 @@ impl WebSession {
 
 pub struct UiView {
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
 }
 
 impl UiView {
-    fn new(client: sandstorm_api::Client<::capnp::any_pointer::Owned>) -> UiView {
+    fn new(client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+           saved_ui_views: SavedUiViewSet) -> UiView
+    {
         UiView {
             sandstorm_api: client,
+            saved_ui_views: Rc::new(RefCell::new(saved_ui_views)),
         }
     }
 }
@@ -472,7 +550,8 @@ impl ui_view::Server for UiView {
         let session = pry!(WebSession::new(pry!(params.get_user_info()),
                                            pry!(params.get_context()),
                                            pry!(params.get_session_params().get_as()),
-                                           self.sandstorm_api.clone()));
+                                           self.sandstorm_api.clone(),
+                                           self.saved_ui_views.clone()));
         let client: web_session::Client =
             web_session::ToClient::new(session).from_server::<::capnp_rpc::Server>();
 
@@ -490,8 +569,10 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         // sandstorm launches us with a connection on file descriptor 3
 	    let stream = try!(unsafe { network.wrap_raw_socket_descriptor(3) });
 
+        let saved_uiviews = try!(SavedUiViewSet::new("/var/sturdyrefs"));
+
         let (p, f) = Promise::and_fulfiller();
-        let uiview = UiView::new(::capnp_rpc::new_promise_client(p));
+        let uiview = UiView::new(::capnp_rpc::new_promise_client(p), saved_uiviews);
 
         let client = ui_view::ToClient::new(uiview).from_server::<::capnp_rpc::Server>();
         let network =
