@@ -48,6 +48,10 @@ impl web_socket_stream::Server for WebSocketStream {
                   -> Promise<(), Error>
     {
         let message = pry!(pry!(params.get()).get_message());
+        let opcode = message[0] & 0xf; // or is it 0xf0?
+        let masked = (message[1] & 0x80) != 0;
+        let length = message[1] & 0x7f;
+        println!("opcode {}, masked {}, length {}", opcode, masked, length);
         println!("websocket message {:?}", message);
         Promise::ok(())
     }
@@ -324,10 +328,15 @@ impl web_session::Server for WebSession {
         println!("open web socket!");
         let client_stream = pry!(pry!(params.get()).get_client_stream());
 
+
+
         results.get().set_server_stream(
             web_socket_stream::ToClient::new(
-                WebSocketStream::new(client_stream)).from_server::<::capnp_rpc::Server>());
-        Promise::ok(())
+                WebSocketStream::new(client_stream.clone())).from_server::<::capnp_rpc::Server>());
+
+        let mut req = client_stream.send_bytes_request();
+        req.get().set_message(&[129, 2, 97, 98]);
+        req.send().promise.map(|_| Ok(()))
     }
 }
 

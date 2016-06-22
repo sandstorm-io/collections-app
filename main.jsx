@@ -97,7 +97,7 @@ class AddGrain extends React.Component {
   }
 
   handleClick(event) {
-    console.log("clicked");
+    console.log("clicked add grain");
     doRequest(interfaces.uiView);
   }
 
@@ -106,10 +106,41 @@ class AddGrain extends React.Component {
   }
 }
 
+class OpenWebSocket extends React.Component {
+  props: {};
+  state: {};
+
+  constructor(props) {
+    super(props);
+  }
+
+  handleClick(event) {
+    console.log("clicked open web socket");
+    let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
+    let ws = new WebSocket(wsProtocol + "://" + window.location.host);
+    ws.onopen = (e) => {
+      console.log("opened!");
+      ws.send("a");
+      ws.send("ab");
+      ws.send("abc");
+      //ws.close();
+    };
+
+    ws.onmessage = (m) => {
+      console.log("websocket got message: ", m);
+    }
+  }
+
+  render() {
+    return <button onClick={this.handleClick}> open web socket </button>;
+  }
+}
+
 ReactDOM.render(
   <div><h1>Collections</h1>
     <main>
       <AddGrain/>
+      <OpenWebSocket/>
     </main>
   </div>,
   document.getElementById("main")
