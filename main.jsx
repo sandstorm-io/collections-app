@@ -1,6 +1,6 @@
-require("babel-polyfill");
-const React = require('react');
-const ReactDOM = require('react-dom');
+import "babel-polyfill";
+import React from "react";
+import ReactDOM from "react-dom";
 
 
 function Delete() {}
