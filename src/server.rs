@@ -37,10 +37,18 @@ use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
 pub struct WebSocketStream {
+    id: u64,
     client_stream: web_socket_stream::Client,
     timer: ::gjio::Timer,
     awaiting_pong: Rc<Cell<bool>>,
-    ping_pong_promise: Promise<(), Error>,
+    _ping_pong_promise: Promise<(), Error>,
+    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
+}
+
+impl Drop for WebSocketStream {
+    fn drop(&mut self) {
+        self.saved_ui_views.borrow_mut().subscribers.remove(&self.id);
+    }
 }
 
 fn do_ping_pong(client_stream: web_socket_stream::Client,
@@ -65,8 +73,12 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
 
 
 impl WebSocketStream {
-    fn new(client_stream: web_socket_stream::Client,
-           timer: ::gjio::Timer) -> WebSocketStream {
+    fn new(id: u64,
+           client_stream: web_socket_stream::Client,
+           timer: ::gjio::Timer,
+           saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
+           -> WebSocketStream
+    {
         let awaiting = Rc::new(Cell::new(false));
         let ping_pong_promise = do_ping_pong(client_stream.clone(),
                                              timer.clone(),
@@ -76,10 +88,12 @@ impl WebSocketStream {
         }).eagerly_evaluate();
 
         WebSocketStream {
+            id: id,
             client_stream: client_stream,
             timer: timer,
             awaiting_pong: awaiting,
-            ping_pong_promise: ping_pong_promise,
+            _ping_pong_promise: ping_pong_promise,
+            saved_ui_views: saved_ui_views,
         }
     }
 }
@@ -133,7 +147,8 @@ struct SavedUiViewData {
 pub struct SavedUiViewSet {
     base_path: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
-//    subscribers: 
+    next_id: u64,
+    subscribers: HashMap<u64, web_socket_stream::Client>,
 }
 
 impl SavedUiViewSet {
@@ -174,6 +189,8 @@ impl SavedUiViewSet {
         Ok(SavedUiViewSet {
             base_path: token_directory.as_ref().to_path_buf(),
             views: map,
+            next_id: 0,
+            subscribers: HashMap::new(),
         })
     }
 
@@ -209,6 +226,18 @@ impl SavedUiViewSet {
         Ok(())
     }
 
+    fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
+                                 client_stream: web_socket_stream::Client,
+                                 timer: &::gjio::Timer)
+                                 -> WebSocketStream
+    {
+        let id = set.borrow().next_id;
+        set.borrow_mut().next_id = id + 1;
+
+        set.borrow_mut().subscribers.insert(id, client_stream.clone());
+        WebSocketStream::new(id, client_stream, timer.clone(), set.clone())
+    }
+    
 //    subscribe(&mut self, 
 }
 
@@ -504,12 +533,12 @@ impl web_session::Server for WebSession {
         let client_stream = pry!(pry!(params.get()).get_client_stream());
 
 
-
         results.get().set_server_stream(
             web_socket_stream::ToClient::new(
-                WebSocketStream::new(
+                SavedUiViewSet::new_subscribed_websocket(
+                    &self.saved_ui_views,
                     client_stream,
-                    self.timer.clone())).from_server::<::capnp_rpc::Server>());
+                    &self.timer)).from_server::<::capnp_rpc::Server>());
 
         Promise::ok(())
     }
