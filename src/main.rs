@@ -26,6 +26,10 @@ extern crate capnp_rpc;
 extern crate rustc_serialize;
 extern crate sandstorm;
 
+pub mod collections_capnp {
+  include!(concat!(env!("OUT_DIR"), "/collections_capnp.rs"));
+}
+
 pub mod server;
 
 fn main() {

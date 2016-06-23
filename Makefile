@@ -25,7 +25,7 @@ spk/style.css.gz: package.json style.scss
 	npm run-script postcss
 	gzip -c tmp/style.css > spk/style.css.gz
 
-target/release/server: src/
+target/release/server: src/ schema/ build.rs
 	cargo build --release
 
 spk/server: target/release/server
