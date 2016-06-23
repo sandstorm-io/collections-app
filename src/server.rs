@@ -54,8 +54,11 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
     awaiting_pong.set(true);
     promise.then(move|_| {
         timer.after_delay(::std::time::Duration::new(10, 0)).lift().then(move |_| {
-            // TODO check that pong has been received.
-            do_ping_pong(client_stream, timer, awaiting_pong)
+            if awaiting_pong.get() {
+                Promise::err(Error::failed("pong not received within 10 seconds".into()))
+            } else {
+                do_ping_pong(client_stream, timer, awaiting_pong)
+            }
         })
     })
 }
@@ -91,6 +94,28 @@ impl web_socket_stream::Server for WebSocketStream {
         let opcode = message[0] & 0xf; // or is it 0xf0?
         let masked = (message[1] & 0x80) != 0;
         let length = message[1] & 0x7f;
+
+        match opcode {
+            0x0 => { // CONTINUE
+            }
+            0x1 => { // UTF-8 PAYLOAD
+            }
+            0x2 => { // BINARY PAYLOAD
+            }
+            0x8 => { // TERMINATE
+                // TODO: drop things to get them to close.
+            }
+            0x9 => { // PING
+                //TODO
+                println!("the client sent us a ping!");
+            }
+            0xa => { // PONG
+                self.awaiting_pong.set(false);
+            }
+            _ => { // OTHER
+                println!("unrecognized websocket opcode {}", opcode);
+            }
+        }
         println!("opcode {}, masked {}, length {}", opcode, masked, length);
         println!("websocket message {:?}", message);
         Promise::ok(())
@@ -483,12 +508,10 @@ impl web_session::Server for WebSession {
         results.get().set_server_stream(
             web_socket_stream::ToClient::new(
                 WebSocketStream::new(
-                    client_stream.clone(),
+                    client_stream,
                     self.timer.clone())).from_server::<::capnp_rpc::Server>());
 
-        let mut req = client_stream.send_bytes_request();
-        req.get().set_message(&[129, 2, 97, 98]);
-        req.send().promise.map(|_| Ok(()))
+        Promise::ok(())
     }
 }
 
