@@ -25,7 +25,7 @@ use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use rustc_serialize::{base64, hex, json};
 
 use std::collections::hash_map::HashMap;
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use collections_capnp::ui_view_metadata;
@@ -38,12 +38,45 @@ use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
 pub struct WebSocketStream {
     client_stream: web_socket_stream::Client,
+    timer: ::gjio::Timer,
+    awaiting_pong: Rc<Cell<bool>>,
+    ping_pong_promise: Promise<(), Error>,
 }
 
+fn do_ping_pong(client_stream: web_socket_stream::Client,
+                timer: ::gjio::Timer,
+                awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
+{
+    println!("pinging");
+    let mut req = client_stream.send_bytes_request();
+    req.get().set_message(&[0x89, 0]); // PING
+    let promise = req.send().promise;
+    awaiting_pong.set(true);
+    promise.then(move|_| {
+        timer.after_delay(::std::time::Duration::new(10, 0)).lift().then(move |_| {
+            // TODO check that pong has been received.
+            do_ping_pong(client_stream, timer, awaiting_pong)
+        })
+    })
+}
+
+
 impl WebSocketStream {
-    fn new(client_stream: web_socket_stream::Client) -> WebSocketStream {
+    fn new(client_stream: web_socket_stream::Client,
+           timer: ::gjio::Timer) -> WebSocketStream {
+        let awaiting = Rc::new(Cell::new(false));
+        let ping_pong_promise = do_ping_pong(client_stream.clone(),
+                                             timer.clone(),
+                                             awaiting.clone()).map_else(|r| match r {
+            Ok(_) => Ok(()),
+            Err(e) => {println!("ERROR {}", e); Ok(())  }
+        }).eagerly_evaluate();
+
         WebSocketStream {
             client_stream: client_stream,
+            timer: timer,
+            awaiting_pong: awaiting,
+            ping_pong_promise: ping_pong_promise,
         }
     }
 }
@@ -75,14 +108,13 @@ struct SavedUiViewData {
 pub struct SavedUiViewSet {
     base_path: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
+//    subscribers: 
 }
 
 impl SavedUiViewSet {
     pub fn new<P>(token_directory: P) -> ::capnp::Result<SavedUiViewSet>
         where P: AsRef<::std::path::Path>
     {
-        use std::io::Read;
-
         // create token directory if it does not yet exist
         try!(::std::fs::create_dir_all(&token_directory));
 
@@ -151,9 +183,12 @@ impl SavedUiViewSet {
         self.views.insert(token, entry);
         Ok(())
     }
+
+//    subscribe(&mut self, 
 }
 
 pub struct WebSession {
+    timer: ::gjio::Timer,
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
@@ -162,7 +197,8 @@ pub struct WebSession {
 }
 
 impl WebSession {
-    pub fn new(user_info: user_info::Reader,
+    pub fn new(timer: ::gjio::Timer,
+               user_info: user_info::Reader,
                _context: session_context::Client,
                params: web_session::params::Reader,
                sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
@@ -174,6 +210,7 @@ impl WebSession {
         let can_write = permissions.len() > 0 && permissions.get(0);
 
         Ok(WebSession {
+            timer: timer,
             can_write: can_write,
             sandstorm_api: sandstorm_api,
             saved_ui_views: saved_ui_views,
@@ -445,7 +482,9 @@ impl web_session::Server for WebSession {
 
         results.get().set_server_stream(
             web_socket_stream::ToClient::new(
-                WebSocketStream::new(client_stream.clone())).from_server::<::capnp_rpc::Server>());
+                WebSocketStream::new(
+                    client_stream.clone(),
+                    self.timer.clone())).from_server::<::capnp_rpc::Server>());
 
         let mut req = client_stream.send_bytes_request();
         req.get().set_message(&[129, 2, 97, 98]);
@@ -523,15 +562,18 @@ impl WebSession {
 }
 
 pub struct UiView {
+    timer: ::gjio::Timer,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
 }
 
 impl UiView {
-    fn new(client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    fn new(timer: ::gjio::Timer,
+           client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
            saved_ui_views: SavedUiViewSet) -> UiView
     {
         UiView {
+            timer: timer,
             sandstorm_api: client,
             saved_ui_views: Rc::new(RefCell::new(saved_ui_views)),
         }
@@ -584,11 +626,13 @@ impl ui_view::Server for UiView {
             return Promise::err(Error::failed("unsupported session type".to_string()));
         }
 
-        let session = pry!(WebSession::new(pry!(params.get_user_info()),
-                                           pry!(params.get_context()),
-                                           pry!(params.get_session_params().get_as()),
-                                           self.sandstorm_api.clone(),
-                                           self.saved_ui_views.clone()));
+        let session = pry!(WebSession::new(
+            self.timer.clone(),
+            pry!(params.get_user_info()),
+            pry!(params.get_context()),
+            pry!(params.get_session_params().get_as()),
+            self.sandstorm_api.clone(),
+            self.saved_ui_views.clone()));
         let client: web_session::Client =
             web_session::ToClient::new(session).from_server::<::capnp_rpc::Server>();
 
@@ -609,7 +653,10 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         let saved_uiviews = try!(SavedUiViewSet::new("/var/sturdyrefs"));
 
         let (p, f) = Promise::and_fulfiller();
-        let uiview = UiView::new(::capnp_rpc::new_promise_client(p), saved_uiviews);
+        let uiview = UiView::new(
+            event_port.get_timer(),
+            ::capnp_rpc::new_promise_client(p),
+            saved_uiviews);
 
         let client = ui_view::ToClient::new(uiview).from_server::<::capnp_rpc::Server>();
         let network =
