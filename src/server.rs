@@ -22,11 +22,13 @@
 use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::base64;
+use rustc_serialize::{hex, base64};
 
 use std::collections::hash_map::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use collections_capnp::ui_view_metadata;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
@@ -62,8 +64,12 @@ impl web_socket_stream::Server for WebSocketStream {
     }
 }
 
+#[derive(RustcDecodable, RustcEncodable)]
 struct SavedUiViewData {
+    token: String,
     title: String,
+    date_saved: u64,
+    added_by: String,
 }
 
 pub struct SavedUiViewSet {
@@ -72,7 +78,7 @@ pub struct SavedUiViewSet {
 }
 
 impl SavedUiViewSet {
-    pub fn new<P>(token_directory: P) -> ::std::io::Result<SavedUiViewSet>
+    pub fn new<P>(token_directory: P) -> ::capnp::Result<SavedUiViewSet>
         where P: AsRef<::std::path::Path>
     {
         use std::io::Read;
@@ -93,11 +99,17 @@ impl SavedUiViewSet {
             };
 
             let mut reader = try!(::std::fs::File::open(dir_entry.path()));
-            let mut title = String::new();
-            try!(reader.read_to_string(&mut title));
+            let message = try!(::capnp::serialize::read_message(&mut reader, Default::default()));
+            let metadata: ui_view_metadata::Reader = try!(message.get_root());
 
-            map.insert(token,
-                       SavedUiViewData { title: title });
+            let entry = SavedUiViewData {
+                token: token.clone(),
+                title: try!(metadata.get_title()).into(),
+                date_saved: metadata.get_date_saved(),
+                added_by: try!(metadata.get_added_by()).into(),
+            };
+
+            map.insert(token, entry);
         }
 
         Ok(SavedUiViewSet {
@@ -106,16 +118,35 @@ impl SavedUiViewSet {
         })
     }
 
-    fn insert(&mut self, binary_token: &[u8], title: String) -> ::std::io::Result<()> {
-        use std::io::Write;
+    fn insert(&mut self, binary_token: &[u8], title: String,
+              added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
+        let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
+        let date_saved = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
+
         let mut token_path = ::std::path::PathBuf::new();
         token_path.push(self.base_path.clone());
         token_path.push(token.clone());
         let mut writer = try!(::std::fs::File::create(token_path));
-        try!(writer.write_all(title.as_bytes()));
-        self.views.insert(token,
-                          SavedUiViewData { title: title });
+
+        let mut message = ::capnp::message::Builder::new_default();
+        {
+            let mut metadata: ui_view_metadata::Builder = message.init_root();
+            metadata.set_title(&title);
+            metadata.set_date_saved(date_saved);
+            metadata.set_added_by(&added_by);
+        }
+
+        try!(::capnp::serialize::write_message(&mut writer, &message));
+
+        let entry = SavedUiViewData {
+            token: token.clone(),
+            title: title,
+            date_saved: date_saved,
+            added_by: added_by,
+        };
+
+        self.views.insert(token, entry);
         Ok(())
     }
 }
@@ -124,6 +155,7 @@ pub struct WebSession {
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
+    identity_id: String,
     static_asset_path: String,
 }
 
@@ -143,6 +175,7 @@ impl WebSession {
             can_write: can_write,
             sandstorm_api: sandstorm_api,
             saved_ui_views: saved_ui_views,
+            identity_id: hex::ToHex::to_hex(try!(user_info.get_identity_id())),
             static_asset_path: try!(params.get_static_asset_path()).into(),
         })
 
@@ -285,6 +318,7 @@ impl web_session::Server for WebSession {
         req.get().set_request_token(token);
         let static_asset_path = self.static_asset_path.clone();
         let saved_ui_views = self.saved_ui_views.clone();
+        let identity_id = self.identity_id.clone();
         let do_stuff = req.send().promise.then(move |response| {
             println!("restored!");
             let sealed_ui_view: ui_view::Client =
@@ -317,7 +351,8 @@ impl web_session::Server for WebSession {
                 }
                 req.send().promise.map(move |response| {
                     let token = try!(try!(response.get()).get_token());
-                    try!(saved_ui_views.borrow_mut().insert(token, grain_title));
+
+                    try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
                     Ok(())
                 })
             })
