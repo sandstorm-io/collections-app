@@ -22,7 +22,7 @@
 use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{hex, base64};
+use rustc_serialize::{base64, hex, json};
 
 use std::collections::hash_map::HashMap;
 use std::cell::RefCell;
@@ -68,7 +68,7 @@ impl web_socket_stream::Server for WebSocketStream {
 struct SavedUiViewData {
     token: String,
     title: String,
-    date_saved: u64,
+    date_saved: f64,
     added_by: String,
 }
 
@@ -109,6 +109,8 @@ impl SavedUiViewSet {
                 added_by: try!(metadata.get_added_by()).into(),
             };
 
+
+            println!("here: {}", json::encode(&entry).unwrap());
             map.insert(token, entry);
         }
 
@@ -122,7 +124,7 @@ impl SavedUiViewSet {
               added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
         let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
-        let date_saved = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
+        let date_saved = (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64) as f64;
 
         let mut token_path = ::std::path::PathBuf::new();
         token_path.push(self.base_path.clone());
