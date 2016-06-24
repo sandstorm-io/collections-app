@@ -136,22 +136,22 @@ impl web_socket_stream::Server for WebSocketStream {
     }
 }
 
-fn encode_websocket_message(websocket: web_socket_stream::SendBytesParams,
+fn encode_websocket_message(mut params: web_socket_stream::send_bytes_params::Builder,
                             message: &str)
-                            -> Result<(), Error>
 {
     // TODO(perf) avoid this allocation
     let mut bytes: Vec<u8> = Vec::new();
     bytes.push(0x81);
     if message.len() < 126 {
-        bytes.push(0x80 | (message.len() as u8));
+        bytes.push(message.len() as u8);
     } else if message.len() < 1 << 16  {
         // 16 bits
-        bytes.push(0xaf);
+        bytes.push(0x7e);
         bytes.push((message.len() >> 8) as u8);
         bytes.push(message.len() as u8);
     } else {
         // 64 bits
+        bytes.push(0x7f);
         bytes.push((message.len() >> 56) as u8);
         bytes.push((message.len() >> 48) as u8);
         bytes.push((message.len() >> 40) as u8);
@@ -163,7 +163,8 @@ fn encode_websocket_message(websocket: web_socket_stream::SendBytesParams,
     }
 
     bytes.extend_from_slice(message.as_bytes());
-    Ok(())
+
+    params.set_message(&bytes[..]);
 }
 
 #[derive(RustcDecodable, RustcEncodable)]
@@ -174,11 +175,21 @@ struct SavedUiViewData {
     added_by: String,
 }
 
+struct Reaper;
+
+impl ::gj::TaskReaper<(), Error> for Reaper {
+    fn task_failed(&mut self, error: Error) {
+        // TODO better message.
+        println!("task failed: {}", error);
+    }
+}
+
 pub struct SavedUiViewSet {
     base_path: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
+    tasks: ::gj::TaskSet<(), Error>,
 }
 
 impl SavedUiViewSet {
@@ -211,8 +222,6 @@ impl SavedUiViewSet {
                 added_by: try!(metadata.get_added_by()).into(),
             };
 
-
-            println!("here: {}", json::encode(&entry).unwrap());
             map.insert(token, entry);
         }
 
@@ -221,6 +230,7 @@ impl SavedUiViewSet {
             views: map,
             next_id: 0,
             subscribers: HashMap::new(),
+            tasks: ::gj::TaskSet::new(Box::new(Reaper)),
         })
     }
 
@@ -265,10 +275,20 @@ impl SavedUiViewSet {
         set.borrow_mut().next_id = id + 1;
 
         set.borrow_mut().subscribers.insert(id, client_stream.clone());
+
+        let mut task = Promise::ok(());
+        for (_, v) in &set.borrow().views {
+            let json_string = json::encode(v).expect("json encoding");
+            let mut req = client_stream.send_bytes_request();
+            encode_websocket_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task = task.then(|_| promise);
+        }
+
+        set.borrow_mut().tasks.add(task);
+
         WebSocketStream::new(id, client_stream, timer.clone(), set.clone())
     }
-    
-//    subscribe(&mut self, 
 }
 
 pub struct WebSession {
