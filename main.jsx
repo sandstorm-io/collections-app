@@ -106,24 +106,6 @@ class AddGrain extends React.Component {
   }
 }
 
-class RemoveGrain extends React.Component {
-  props: {};
-  state: {};
-
-  constructor(props) {
-    super(props);
-  }
-
-  handleClick(event) {
-    console.log("clicked remove grain");
-  }
-
-  render() {
-    return <button onClick={this.handleClick}> Unlink from collection... </button>;
-  }
-
-}
-
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 function makeDateString(date) {
   if (!date) {
@@ -177,6 +159,10 @@ class GrainList extends React.Component {
 
   }
 
+  clickRemoveGrain() {
+    console.log("clicked remove grain");
+  }
+
   render () {
     const grainRows = [];
     for (let e of this.state.grains.entries()) {
@@ -195,6 +181,7 @@ class GrainList extends React.Component {
     }
 
     return <div className="grain-list">
+        <button onClick={this.clickRemoveGrain}> Unlink from collection... </button>
         <table className="grain-list-table">
           <thead>
             <tr>
@@ -216,10 +203,9 @@ class GrainList extends React.Component {
 }
 
 ReactDOM.render(
-    <div><h1>Collections</h1>
-          <RemoveGrain/>
-      <AddGrain/>
-      <GrainList/>
+    <div><p>short editable description</p>
+    <AddGrain/>
+    <GrainList/>
   </div>,
   document.getElementById("main")
 );

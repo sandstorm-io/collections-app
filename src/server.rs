@@ -194,8 +194,8 @@ impl Action {
                 format!("{{\"insert\":{{\"token\":\"{}\",\"data\":{} }} }}",
                         token, data.to_json())
             }
-            &Action::Remove { .. } => {
-                unimplemented!()
+            &Action::Remove { ref token } => {
+                format!("{{\"remove\":\"{}\"}}", token)
             }
         }
     }
@@ -287,17 +287,33 @@ impl SavedUiViewSet {
         };
 
         let json_string = Action::Insert { token: token.clone(), data: entry.clone() }.to_json();
-
+        self.send_message_to_subscribers(&json_string);
         self.views.insert(token, entry);
-
-        for (_, sub) in &self.subscribers {
-            let mut req = sub.send_bytes_request();
-            encode_websocket_message(req.get(), &json_string);
-            self.tasks.add(req.send().promise.map(|_| Ok(())));
-        }
 
         Ok(())
     }
+
+    fn send_message_to_subscribers(&mut self, message: &str) {
+        for (_, sub) in &self.subscribers {
+            let mut req = sub.send_bytes_request();
+            encode_websocket_message(req.get(), message);
+            self.tasks.add(req.send().promise.map(|_| Ok(())));
+        }
+    }
+
+    fn remove(&mut self, token: &str) -> Result<(), Error> {
+
+        if let Err(e) = ::std::fs::remove_file(format!("/var/sturdyrefs/{}", token)) {
+            if e.kind() != ::std::io::ErrorKind::NotFound {
+                return Err(e.into())
+            }
+        }
+
+        let json_string = Action::Remove { token: token.into() }.to_json();
+        self.send_message_to_subscribers(&json_string);
+        Ok(())
+    }
+
 
     fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
                                  client_stream: web_socket_stream::Client,
@@ -593,8 +609,8 @@ impl web_session::Server for WebSession {
         let path = pry!(pry!(params.get()).get_path());
         pry!(self.require_canonical_path(path));
 
-        if !path.starts_with("var/") {
-            return Promise::err(Error::failed("DELETE only supported under /var.".to_string()));
+        if !path.starts_with("sturdyref/") {
+            return Promise::err(Error::failed("DELETE only supported under sturdyref/".to_string()));
         }
 
         if !self.can_write {
@@ -602,11 +618,7 @@ impl web_session::Server for WebSession {
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
             Promise::ok(())
         } else {
-            if let Err(e) = ::std::fs::remove_file(path) {
-                if e.kind() != ::std::io::ErrorKind::NotFound {
-                    return Promise::err(e.into())
-                }
-            }
+            pry!(self.saved_ui_views.borrow_mut().remove(&path[10..]));
             results.get().init_no_content();
             Promise::ok(())
         }
