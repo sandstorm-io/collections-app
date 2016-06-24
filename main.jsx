@@ -2,6 +2,7 @@ import "babel-polyfill";
 import React from "react";
 import ReactDOM from "react-dom";
 import Immutable from "immutable";
+import _ from "underscore";
 
 function Delete() {}
 
@@ -153,22 +154,39 @@ class GrainList extends React.Component {
                                                 action.insert.data);
         this.setState({grains: newGrains});
       } else if (action.remove) {
-        console.log("remove!");
+        console.log("remove! ", action.remove.token);
+        const newGrains = this.state.grains.delete(action.remove.token);
+        this.setState({grains: newGrains});
       }
     }
 
   }
 
-  clickRemoveGrain() {
-    console.log("clicked remove grain");
+  clickRemoveGrain(e) {
+    for (let e of this.state.grains.entries()) {
+      if (e[1].checked) {
+        http("/sturdyref/" + e[0], new Delete())
+      }
+    }
   }
 
-  render () {
+  selectGrain(e) {
+    const token = e.target.getAttribute("data-token");
+    console.log("select grain", token);
+
+    const oldValue = this.state.grains.get(token);
+    const newValue = _.clone(oldValue);
+    newValue.checked = !oldValue.checked;
+    this.setState({grains: this.state.grains.set(token, newValue)});
+
+  }
+
+  render() {
     const grainRows = [];
     for (let e of this.state.grains.entries()) {
       grainRows.push(
-          <tr classNamme="grain">
-          <td><input type="checkbox"/>
+          <tr classNamme="grain" key={e[0]}>
+          <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
           </td>
           <td></td>
           <td>
@@ -181,7 +199,7 @@ class GrainList extends React.Component {
     }
 
     return <div className="grain-list">
-        <button onClick={this.clickRemoveGrain}> Unlink from collection... </button>
+      <button onClick={this.clickRemoveGrain.bind(this)}> Unlink from collection... </button>
         <table className="grain-list-table">
           <thead>
             <tr>

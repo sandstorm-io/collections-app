@@ -195,7 +195,7 @@ impl Action {
                         token, data.to_json())
             }
             &Action::Remove { ref token } => {
-                format!("{{\"remove\":\"{}\"}}", token)
+                format!("{{\"remove\":{{\"token\":\"{}\"}}}}", token)
             }
         }
     }
@@ -302,7 +302,6 @@ impl SavedUiViewSet {
     }
 
     fn remove(&mut self, token: &str) -> Result<(), Error> {
-
         if let Err(e) = ::std::fs::remove_file(format!("/var/sturdyrefs/{}", token)) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
                 return Err(e.into())
