@@ -124,6 +124,30 @@ class RemoveGrain extends React.Component {
 
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function makeDateString(date) {
+  if (!date) {
+    return "";
+  }
+
+  let result;
+
+  const now = new Date();
+  const diff = now.valueOf() - date.valueOf();
+
+  if (diff < 86400000 && now.getDate() === date.getDate()) {
+    result = date.toLocaleTimeString();
+  } else {
+    result = MONTHS[date.getMonth()] + " " + date.getDate() + " ";
+
+    if (now.getFullYear() !== date.getFullYear()) {
+      result = date.getFullYear() + " " + result;
+    }
+  }
+
+  return result;
+};
+
 class GrainList extends React.Component {
   props: {};
   state: { grains: Immutable.Map};
@@ -164,7 +188,7 @@ class GrainList extends React.Component {
           <td>
           {e[1].title}
         </td>
-          <td> {e[1].date_saved}</td>
+          <td> {makeDateString(new Date(parseInt(e[1].date_added)))}</td>
           <td> {e[1].added_by}</td>
           </tr>
       );
