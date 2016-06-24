@@ -136,6 +136,36 @@ impl web_socket_stream::Server for WebSocketStream {
     }
 }
 
+fn encode_websocket_message(websocket: web_socket_stream::SendBytesParams,
+                            message: &str)
+                            -> Result<(), Error>
+{
+    // TODO(perf) avoid this allocation
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.push(0x81);
+    if message.len() < 126 {
+        bytes.push(0x80 | (message.len() as u8));
+    } else if message.len() < 1 << 16  {
+        // 16 bits
+        bytes.push(0xaf);
+        bytes.push((message.len() >> 8) as u8);
+        bytes.push(message.len() as u8);
+    } else {
+        // 64 bits
+        bytes.push((message.len() >> 56) as u8);
+        bytes.push((message.len() >> 48) as u8);
+        bytes.push((message.len() >> 40) as u8);
+        bytes.push((message.len() >> 32) as u8);
+        bytes.push((message.len() >> 16) as u8);
+        bytes.push((message.len() >> 24) as u8);
+        bytes.push((message.len() >> 8) as u8);
+        bytes.push(message.len() as u8);
+    }
+
+    bytes.extend_from_slice(message.as_bytes());
+    Ok(())
+}
+
 #[derive(RustcDecodable, RustcEncodable)]
 struct SavedUiViewData {
     token: String,
