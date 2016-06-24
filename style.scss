@@ -278,7 +278,7 @@ $grainlist-table-row-outline-color: #d3d3d3;
         background-color: $grainlist-table-header-background-color-hover;
       }
       */
-      &.shared-or-owned {
+      &.added-by {
         width: 110px;
         // The mobile viewport is too small to display this much text
         @media #{$mobile} {
@@ -317,7 +317,7 @@ $grainlist-table-row-outline-color: #d3d3d3;
 
         }
       }
-      &.last-used {
+      &.date-added {
         width: 100px;
       }
       &.shared-or-owned {

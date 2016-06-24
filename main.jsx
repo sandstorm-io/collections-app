@@ -106,6 +106,24 @@ class AddGrain extends React.Component {
   }
 }
 
+class RemoveGrain extends React.Component {
+  props: {};
+  state: {};
+
+  constructor(props) {
+    super(props);
+  }
+
+  handleClick(event) {
+    console.log("clicked remove grain");
+  }
+
+  render() {
+    return <button onClick={this.handleClick}> Unlink from collection... </button>;
+  }
+
+}
+
 class GrainList extends React.Component {
   props: {};
   state: { grains: Immutable.Map};
@@ -140,11 +158,14 @@ class GrainList extends React.Component {
     for (let e of this.state.grains.entries()) {
       grainRows.push(
           <tr classNamme="grain">
-          <td>
+          <td><input type="checkbox"/>
           </td>
+          <td></td>
           <td>
           {e[1].title}
-          </td>
+        </td>
+          <td> {e[1].date_saved}</td>
+          <td> {e[1].added_by}</td>
           </tr>
       );
     }
@@ -158,8 +179,8 @@ class GrainList extends React.Component {
               </td>
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
-              <td className="last-used">Last activity</td>
-              <td className="shared-or-owned">Mine/Shared</td>
+              <td className="date-added">Date added</td>
+              <td className="added-by">Added by</td>
             </tr>
           </thead>
         <tbody>
@@ -171,7 +192,8 @@ class GrainList extends React.Component {
 }
 
 ReactDOM.render(
-      <div><h1>Collections</h1>
+    <div><h1>Collections</h1>
+          <RemoveGrain/>
       <AddGrain/>
       <GrainList/>
   </div>,
