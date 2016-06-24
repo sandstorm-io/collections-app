@@ -39,7 +39,6 @@ use sandstorm::web_session_capnp::web_session::web_socket_stream;
 pub struct WebSocketStream {
     id: u64,
     client_stream: web_socket_stream::Client,
-    timer: ::gjio::Timer,
     awaiting_pong: Rc<Cell<bool>>,
     _ping_pong_promise: Promise<(), Error>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
@@ -81,7 +80,7 @@ impl WebSocketStream {
     {
         let awaiting = Rc::new(Cell::new(false));
         let ping_pong_promise = do_ping_pong(client_stream.clone(),
-                                             timer.clone(),
+                                             timer,
                                              awaiting.clone()).map_else(|r| match r {
             Ok(_) => Ok(()),
             Err(e) => {println!("ERROR {}", e); Ok(())  }
@@ -90,7 +89,6 @@ impl WebSocketStream {
         WebSocketStream {
             id: id,
             client_stream: client_stream,
-            timer: timer,
             awaiting_pong: awaiting,
             _ping_pong_promise: ping_pong_promise,
             saved_ui_views: saved_ui_views,
@@ -170,15 +168,15 @@ fn encode_websocket_message(mut params: web_socket_stream::send_bytes_params::Bu
 #[derive(Clone)]
 struct SavedUiViewData {
     title: String,
-    date_saved: u64,
+    date_added: u64,
     added_by: String,
 }
 
 impl SavedUiViewData {
     fn to_json(&self) -> String {
-        format!("{{\"title\":\"{}\",\"date_saved\": \"{}\",\"added_by\":\"{}\"}}",
+        format!("{{\"title\":\"{}\",\"date_added\": \"{}\",\"added_by\":\"{}\"}}",
                 self.title,
-                self.date_saved,
+                self.date_added,
                 self.added_by)
     }
 }
@@ -245,7 +243,7 @@ impl SavedUiViewSet {
 
             let entry = SavedUiViewData {
                 title: try!(metadata.get_title()).into(),
-                date_saved: metadata.get_date_saved(),
+                date_added: metadata.get_date_added(),
                 added_by: try!(metadata.get_added_by()).into(),
             };
 
@@ -265,7 +263,7 @@ impl SavedUiViewSet {
               added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
         let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
-        let date_saved = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
+        let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
         token_path.push(self.base_path.clone());
@@ -276,7 +274,7 @@ impl SavedUiViewSet {
         {
             let mut metadata: ui_view_metadata::Builder = message.init_root();
             metadata.set_title(&title);
-            metadata.set_date_saved(date_saved);
+            metadata.set_date_added(date_added);
             metadata.set_added_by(&added_by);
         }
 
@@ -284,7 +282,7 @@ impl SavedUiViewSet {
 
         let entry = SavedUiViewData {
             title: title,
-            date_saved: date_saved,
+            date_added: date_added,
             added_by: added_by,
         };
 
