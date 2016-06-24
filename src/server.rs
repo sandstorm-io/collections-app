@@ -262,7 +262,16 @@ impl SavedUiViewSet {
             added_by: added_by,
         };
 
+        let json_string = json::encode(&entry).expect("json encoding");
+
         self.views.insert(token, entry);
+
+        for (_, sub) in &self.subscribers {
+            let mut req = sub.send_bytes_request();
+            encode_websocket_message(req.get(), &json_string);
+            self.tasks.add(req.send().promise.map(|_| Ok(())));
+        }
+
         Ok(())
     }
 

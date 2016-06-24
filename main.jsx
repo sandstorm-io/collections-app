@@ -127,7 +127,9 @@ class OpenWebSocket extends React.Component {
     };
 
     ws.onmessage = (m) => {
-      console.log("websocket got message: ", m);
+      console.log("websocket got message: ", m.data);
+      const j = JSON.parse(m.data);
+      console.log("as json: ", JSON.stringify(j));
     }
   }
 
