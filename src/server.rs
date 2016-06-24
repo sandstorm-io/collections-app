@@ -186,7 +186,7 @@ impl SavedUiViewData {
 #[derive(Clone)]
 enum Action {
     Insert { token: String, data: SavedUiViewData },
-    Delete { token: String },
+    Remove { token: String },
 }
 
 impl Action {
@@ -196,7 +196,7 @@ impl Action {
                 format!("{{\"insert\":{{\"token\":\"{}\",\"data\":{} }} }}",
                         token, data.to_json())
             }
-            &Action::Delete { .. } => {
+            &Action::Remove { .. } => {
                 unimplemented!()
             }
         }

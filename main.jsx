@@ -1,7 +1,9 @@
 import "babel-polyfill";
 import React from "react";
 import ReactDOM from "react-dom";
-
+import { Provider } from "react-redux";
+import { createStore } from "redux";
+import Immutable from "immutable";
 
 function Delete() {}
 
@@ -102,74 +104,80 @@ class AddGrain extends React.Component {
   }
 
   render() {
-    return <button onClick={this.handleClick}> AddGrain </button>;
+    return <button onClick={this.handleClick}> Add grain... </button>;
   }
 }
 
-class OpenWebSocket extends React.Component {
+class GrainList extends React.Component {
   props: {};
-  state: {};
+  state: { grains: Immutable.Map};
 
   constructor(props) {
     super(props);
-  }
+    this.state = { grains: Immutable.Map() };
 
-  handleClick(event) {
-    console.log("clicked open web socket");
+
     let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
     let ws = new WebSocket(wsProtocol + "://" + window.location.host);
-    ws.onopen = (e) => {
-      console.log("opened!");
-      ws.send("a");
-      ws.send("ab");
-      ws.send("abc");
-      //ws.close();
-    };
+
+    // TODO: error handling / reconnect
 
     ws.onmessage = (m) => {
       console.log("websocket got message: ", m.data);
-      const j = JSON.parse(m.data);
-      console.log("as json: ", JSON.stringify(j));
+      const action = JSON.parse(m.data);
+      if (action.insert) {
+        console.log("insert!", action.insert);
+        const newGrains = this.state.grains.set(action.insert.token,
+                                                action.insert.data);
+        this.setState({grains: newGrains});
+      } else if (action.remove) {
+        console.log("remove!");
+      }
     }
+
   }
 
-  render() {
-    return <button onClick={this.handleClick}> open web socket </button>;
+  render () {
+    const grainRows = [];
+    for (let e of this.state.grains.entries()) {
+      grainRows.push(
+          <tr classNamme="grain">
+          <td>
+          </td>
+          <td>
+          {e[1].title}
+          </td>
+          </tr>
+      );
+    }
+
+    return <div className="grain-list">
+        <table className="grain-list-table">
+          <thead>
+            <tr>
+              <td className="select-all-grains">
+                <input type="checkbox"/>
+              </td>
+              <td className="td-app-icon"></td>
+              <td className="grain-name">Name</td>
+              <td className="last-used">Last activity</td>
+              <td className="shared-or-owned">Mine/Shared</td>
+            </tr>
+          </thead>
+        <tbody>
+      { grainRows }
+    </tbody>
+    </table>
+      </div>;
   }
 }
 
 ReactDOM.render(
-  <div><h1>Collections</h1>
-    <main>
+      <div><h1>Collections</h1>
       <AddGrain/>
-    <OpenWebSocket/>
-
-    <div className="grain-list">
-    <table className="grain-list-table">
-      <thead>
-        <tr>
-            <td className="select-all-grains">
-              <input type="checkbox"/>
-            </td>
-            <td className="td-app-icon"></td>
-            <td className="grain-name">Name</td>
-            <td className="last-used">Last activity</td>
-            <td className="shared-or-owned">Mine/Shared</td>
-      </tr>
-      </thead>
-    <tbody>
-     <tr className="grain">
-      <td>
-    </td>
-    <td>
-    hi
-    </td>
-      </tr>
-    </tbody>
-    </table>
-   </div>
-
-    </main>
+      <GrainList/>
   </div>,
   document.getElementById("main")
 );
+
+
