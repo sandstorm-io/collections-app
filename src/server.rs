@@ -22,7 +22,7 @@
 use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{base64, hex, json};
+use rustc_serialize::{base64, hex};
 
 use std::collections::hash_map::HashMap;
 use std::cell::{Cell, RefCell};
@@ -167,12 +167,40 @@ fn encode_websocket_message(mut params: web_socket_stream::send_bytes_params::Bu
     params.set_message(&bytes[..]);
 }
 
-#[derive(RustcDecodable, RustcEncodable)]
+#[derive(Clone)]
 struct SavedUiViewData {
-    token: String,
     title: String,
-    date_saved: f64,
+    date_saved: u64,
     added_by: String,
+}
+
+impl SavedUiViewData {
+    fn to_json(&self) -> String {
+        format!("{{\"title\":\"{}\",\"date_saved\": \"{}\",\"added_by\":\"{}\"}}",
+                self.title,
+                self.date_saved,
+                self.added_by)
+    }
+}
+
+#[derive(Clone)]
+enum Action {
+    Insert { token: String, data: SavedUiViewData },
+    Delete { token: String },
+}
+
+impl Action {
+    fn to_json(&self) -> String {
+        match self {
+            &Action::Insert { ref token, ref data } => {
+                format!("{{\"insert\":{{\"token\":\"{}\",\"data\":{} }} }}",
+                        token, data.to_json())
+            }
+            &Action::Delete { .. } => {
+                unimplemented!()
+            }
+        }
+    }
 }
 
 struct Reaper;
@@ -216,7 +244,6 @@ impl SavedUiViewSet {
             let metadata: ui_view_metadata::Reader = try!(message.get_root());
 
             let entry = SavedUiViewData {
-                token: token.clone(),
                 title: try!(metadata.get_title()).into(),
                 date_saved: metadata.get_date_saved(),
                 added_by: try!(metadata.get_added_by()).into(),
@@ -238,7 +265,7 @@ impl SavedUiViewSet {
               added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
         let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
-        let date_saved = (dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64) as f64;
+        let date_saved = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
         token_path.push(self.base_path.clone());
@@ -256,13 +283,12 @@ impl SavedUiViewSet {
         try!(::capnp::serialize::write_message(&mut writer, &message));
 
         let entry = SavedUiViewData {
-            token: token.clone(),
             title: title,
             date_saved: date_saved,
             added_by: added_by,
         };
 
-        let json_string = json::encode(&entry).expect("json encoding");
+        let json_string = Action::Insert { token: token.clone(), data: entry.clone() }.to_json();
 
         self.views.insert(token, entry);
 
@@ -286,8 +312,13 @@ impl SavedUiViewSet {
         set.borrow_mut().subscribers.insert(id, client_stream.clone());
 
         let mut task = Promise::ok(());
-        for (_, v) in &set.borrow().views {
-            let json_string = json::encode(v).expect("json encoding");
+        for (t, v) in &set.borrow().views {
+            let action = Action::Insert {
+                token: t.clone(),
+                data: v.clone()
+            };
+
+            let json_string = action.to_json();
             let mut req = client_stream.send_bytes_request();
             encode_websocket_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
