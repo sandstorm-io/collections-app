@@ -32,7 +32,6 @@ use collections_capnp::ui_view_metadata;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
-use sandstorm::grain_capnp::denormalized_grain_metadata;
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
@@ -350,7 +349,6 @@ pub struct WebSession {
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
     identity_id: String,
-    static_asset_path: String,
 }
 
 impl WebSession {
@@ -372,7 +370,6 @@ impl WebSession {
             sandstorm_api: sandstorm_api,
             saved_ui_views: saved_ui_views,
             identity_id: hex::ToHex::to_hex(try!(user_info.get_identity_id())),
-            static_asset_path: try!(params.get_static_asset_path()).into(),
         })
 
         // `UserInfo` is defined in `sandstorm/grain.capnp` and contains info like:
@@ -503,7 +500,7 @@ impl web_session::Server for WebSession {
                 println!("tag {}", tag.get_id());
                 let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
                 grain_title = pry!(value.get_title()).into();
-                println!("title: {}", grain_title);
+                println!("grain title: {}", grain_title);
 
             }
         }
@@ -512,7 +509,6 @@ impl web_session::Server for WebSession {
         let mut req = self.sandstorm_api.claim_request_request();
         let sandstorm_api = self.sandstorm_api.clone();
         req.get().set_request_token(token);
-        let static_asset_path = self.static_asset_path.clone();
         let saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
         let do_stuff = req.send().promise.then(move |response| {
@@ -523,33 +519,26 @@ impl web_session::Server for WebSession {
             sealed_ui_view.get_view_info_request().send().promise.then(move |response| {
                 println!("got viewinfo");
                 let view_info = pry!(response.get());
-                let metadata = pry!(view_info.get_metadata());
-                let title = pry!(metadata.get_app_title());
-                println!("title: {}", pry!(title.get_default_text()));
+                let title = pry!(view_info.get_app_title());
+                println!("app title: {}", pry!(title.get_default_text()));
 
-                match pry!(metadata.which()) {
-                    denormalized_grain_metadata::Icon(icon) => {
-                        println!("asset URL 1 {}{}", static_asset_path, pry!(icon.get_asset_id()));
-                        println!("asset URL 2 {}{}",
-                                 static_asset_path, pry!(icon.get_asset_id2x_dpi()));
+                let icon = pry!(view_info.get_grain_icon());
+                icon.get_url_request().send().promise.then(move |response| {
+                    let url = pry!(pry!(response.get()).get_url());
+                    println!("grain icon url: {}", url);
 
+                    let mut req = sandstorm_api.save_request();
+                    req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+                    {
+                        let mut save_label = req.get().init_label();
+                        save_label.set_default_text("[save label chosen by collections app]");
                     }
-                    denormalized_grain_metadata::AppId(app_id) => {
-                        println!("app id {}", pry!(app_id));
-                    }
-                }
+                    req.send().promise.map(move |response| {
+                        let token = try!(try!(response.get()).get_token());
 
-                let mut req = sandstorm_api.save_request();
-                req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
-                {
-                    let mut save_label = req.get().init_label();
-                    save_label.set_default_text("[save label chosen by collections app]");
-                }
-                req.send().promise.map(move |response| {
-                    let token = try!(try!(response.get()).get_token());
-
-                    try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
-                    Ok(())
+                        try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
+                        Ok(())
+                    })
                 })
             })
         });
