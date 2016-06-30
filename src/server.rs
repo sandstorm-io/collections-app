@@ -309,6 +309,7 @@ impl SavedUiViewSet {
 
         let json_string = Action::Remove { token: token.into() }.to_json();
         self.send_message_to_subscribers(&json_string);
+        self.views.remove(token);
         Ok(())
     }
 

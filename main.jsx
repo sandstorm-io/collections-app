@@ -132,58 +132,37 @@ function makeDateString(date) {
 };
 
 class GrainList extends React.Component {
-  props: {};
-  state: { grains: Immutable.Map};
+  props: { grains: Immutable.Map };
+  state: { selectedGrains: Immutable.Set };
 
   constructor(props) {
     super(props);
-    this.state = { grains: Immutable.Map() };
-
-
-    let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
-    let ws = new WebSocket(wsProtocol + "://" + window.location.host);
-
-    // TODO: error handling / reconnect
-
-    ws.onmessage = (m) => {
-      console.log("websocket got message: ", m.data);
-      const action = JSON.parse(m.data);
-      if (action.insert) {
-        console.log("insert!", action.insert);
-        const newGrains = this.state.grains.set(action.insert.token,
-                                                action.insert.data);
-        this.setState({grains: newGrains});
-      } else if (action.remove) {
-        console.log("remove! ", action.remove.token);
-        const newGrains = this.state.grains.delete(action.remove.token);
-        this.setState({grains: newGrains});
-      }
-    }
-
+    this.state = { selectedGrains: Immutable.Set() };
   }
 
   clickRemoveGrain(e) {
-    for (let e of this.state.grains.entries()) {
-      if (e[1].checked) {
-        http("/sturdyref/" + e[0], new Delete())
-      }
+    for (let e of this.state.selectedGrains.keys()) {
+      http("/sturdyref/" + e, new Delete());
     }
+
+    this.setState({ selectedGrains: Immutable.Set() });
+
   }
 
   selectGrain(e) {
     const token = e.target.getAttribute("data-token");
     console.log("select grain", token);
-
-    const oldValue = this.state.grains.get(token);
-    const newValue = _.clone(oldValue);
-    newValue.checked = !oldValue.checked;
-    this.setState({grains: this.state.grains.set(token, newValue)});
-
+    console.log("target.value:", );
+    if (e.target.checked) {
+      this.setState({ selectedGrains: this.state.selectedGrains.add(token) });
+    } else {
+      this.setState({ selectedGrains: this.state.selectedGrains.remove(token) });
+    }
   }
 
   render() {
     const grainRows = [];
-    for (let e of this.state.grains.entries()) {
+    for (let e of this.props.grains.entries()) {
       grainRows.push(
           <tr classNamme="grain" key={e[0]}>
           <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
@@ -220,12 +199,45 @@ class GrainList extends React.Component {
   }
 }
 
-ReactDOM.render(
-    <div><p>short editable description</p>
-    <AddGrain/>
-    <GrainList/>
-  </div>,
-  document.getElementById("main")
-);
+class Main extends React.Component {
+  props: {};
+  state: { grains: Immutable.Map};
+
+  constructor(props) {
+    super(props);
+    this.state = { grains: Immutable.Map() };
+
+
+    let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
+    let ws = new WebSocket(wsProtocol + "://" + window.location.host);
+
+    // TODO: error handling / reconnect
+
+    ws.onmessage = (m) => {
+      console.log("websocket got message: ", m.data);
+      const action = JSON.parse(m.data);
+      if (action.insert) {
+        console.log("insert!", action.insert);
+        const newGrains = this.state.grains.set(action.insert.token,
+                                                action.insert.data);
+        this.setState({grains: newGrains});
+      } else if (action.remove) {
+        console.log("remove! ", action.remove.token);
+        const newGrains = this.state.grains.delete(action.remove.token);
+        this.setState({grains: newGrains});
+      }
+    }
+
+  }
+
+  render() {
+    return <div><p>short editable description</p>
+      <AddGrain/>
+      <GrainList grains={this.state.grains}/>
+      </div>;
+  }
+}
+
+ReactDOM.render(<Main/>,  document.getElementById("main"));
 
 
