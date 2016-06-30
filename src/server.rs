@@ -184,6 +184,7 @@ impl SavedUiViewData {
 enum Action {
     Insert { token: String, data: SavedUiViewData },
     Remove { token: String },
+    CanWrite(bool),
 }
 
 impl Action {
@@ -195,6 +196,9 @@ impl Action {
             }
             &Action::Remove { ref token } => {
                 format!("{{\"remove\":{{\"token\":\"{}\"}}}}", token)
+            }
+            &Action::CanWrite(b) => {
+                format!("{{\"canWrite\":{}}}", b)
             }
         }
     }
@@ -315,8 +319,9 @@ impl SavedUiViewSet {
 
 
     fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
-                                 client_stream: web_socket_stream::Client,
-                                 timer: &::gjio::Timer)
+                                client_stream: web_socket_stream::Client,
+                                can_write: bool,
+                                timer: &::gjio::Timer)
                                  -> WebSocketStream
     {
         let id = set.borrow().next_id;
@@ -325,6 +330,15 @@ impl SavedUiViewSet {
         set.borrow_mut().subscribers.insert(id, client_stream.clone());
 
         let mut task = Promise::ok(());
+
+        {
+            let json_string = Action::CanWrite(can_write).to_json();
+            let mut req = client_stream.send_bytes_request();
+            encode_websocket_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task = task.then(|_| promise);
+        }
+
         for (t, v) in &set.borrow().views {
             let action = Action::Insert {
                 token: t.clone(),
@@ -627,6 +641,7 @@ impl web_session::Server for WebSession {
                 SavedUiViewSet::new_subscribed_websocket(
                     &self.saved_ui_views,
                     client_stream,
+                    self.can_write,
                     &self.timer)).from_server::<::capnp_rpc::Server>());
 
         Promise::ok(())

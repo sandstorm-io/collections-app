@@ -201,7 +201,9 @@ class GrainList extends React.Component {
 
 class Main extends React.Component {
   props: {};
-  state: { grains: Immutable.Map};
+  state: { canWrite: bool,
+           grains: Immutable.Map,
+         };
 
   constructor(props) {
     super(props);
@@ -216,7 +218,9 @@ class Main extends React.Component {
     ws.onmessage = (m) => {
       console.log("websocket got message: ", m.data);
       const action = JSON.parse(m.data);
-      if (action.insert) {
+      if (action.canWrite) {
+        this.setState({canWrite: action.canWrite});
+      } else if (action.insert) {
         console.log("insert!", action.insert);
         const newGrains = this.state.grains.set(action.insert.token,
                                                 action.insert.data);
@@ -231,9 +235,10 @@ class Main extends React.Component {
   }
 
   render() {
+
     return <div><p>short editable description</p>
-      <AddGrain/>
-      <GrainList grains={this.state.grains}/>
+      {this.state.canWrite ? <AddGrain/>: [] }:
+      <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
       </div>;
   }
 }
