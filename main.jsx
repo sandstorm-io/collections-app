@@ -199,6 +199,21 @@ class GrainList extends React.Component {
   }
 }
 
+class Description extends React.Component {
+  props: { description: String, canWrite: bool };
+  state: { editing: bool };
+
+  constructor(props) {
+    super(props);
+    this.state = { editing: false };
+  }
+
+
+  render () {
+    return <p>short editable description</p>;
+  }
+}
+
 class Main extends React.Component {
   props: {};
   state: { canWrite: bool,
@@ -236,7 +251,7 @@ class Main extends React.Component {
 
   render() {
 
-    return <div><p>short editable description</p>
+    return <div> <Description canWrite={this.state.canWrite}>
       {this.state.canWrite ? <AddGrain/>: [] }:
       <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
       </div>;
