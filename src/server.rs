@@ -32,6 +32,7 @@ use collections_capnp::ui_view_metadata;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
+use sandstorm::grain_capnp::{static_asset};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
@@ -539,7 +540,13 @@ impl web_session::Server for WebSession {
 
                 let icon = pry!(view_info.get_grain_icon());
                 icon.get_url_request().send().promise.then(move |response| {
-                    let url = pry!(pry!(response.get()).get_url());
+                    let response = pry!(response.get());
+                    let protocol = match pry!(response.get_protocol()) {
+                        static_asset::Protocol::Https => "https".to_string(),
+                        static_asset::Protocol::Http => "http".to_string(),
+                    };
+                    let host_path = pry!(response.get_host_path());
+                    let url = format!("{}://{}", protocol, host_path);
                     println!("grain icon url: {}", url);
 
                     let mut req = sandstorm_api.save_request();

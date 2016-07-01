@@ -251,8 +251,8 @@ class Main extends React.Component {
 
   render() {
 
-    return <div> <Description canWrite={this.state.canWrite}>
-      {this.state.canWrite ? <AddGrain/>: [] }:
+    return <div> <Description canWrite={this.state.canWrite}/>
+      {this.state.canWrite ? <AddGrain/>: [] }
       <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
       </div>;
   }
