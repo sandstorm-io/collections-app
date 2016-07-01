@@ -288,6 +288,26 @@ impl SavedUiViewSet {
         })
     }
 
+    fn update_description(&mut self, description: &[u8]) -> ::capnp::Result<()> {
+        use std::io::Write;
+
+        let desc_string: String = match ::std::str::from_utf8(description) {
+            Err(e) => return Err(::capnp::Error::failed(format!("{}", e))),
+            Ok(d) => d.into(),
+        };
+
+        let temp_path = format!("/var/description.uploading");
+        try!(try!(::std::fs::File::create(&temp_path)).write_all(description));
+        try!(::std::fs::rename(temp_path, "/var/description"));
+
+
+        self.description = desc_string;
+
+        let json_string = Action::Description(self.description.clone()).to_json();
+        self.send_message_to_subscribers(&json_string);
+        Ok(())
+    }
+
     fn insert(&mut self, binary_token: &[u8], title: String,
               added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
@@ -622,21 +642,12 @@ impl web_session::Server for WebSession {
         let path = pry!(params.get_path());
         pry!(self.require_canonical_path(path));
 
-        if !path.starts_with("var/") {
-            return Promise::err(Error::failed("PUT only supported under /var.".to_string()));
-        }
-
         if !self.can_write {
             results.get().init_client_error()
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
-        } else {
-            use std::io::Write;
-            let temp_path = format!("{}.uploading", path);
-            let data = pry!(pry!(params.get_content()).get_content());
-
-            pry!(pry!(::std::fs::File::create(&temp_path)).write_all(data));
-
-            pry!(::std::fs::rename(temp_path, path));
+        } else if path == "description" {
+            let content = pry!(pry!(params.get_content()).get_content());
+            pry!(self.saved_ui_views.borrow_mut().update_description(content));
             results.get().init_no_content();
         }
         Promise::ok(())

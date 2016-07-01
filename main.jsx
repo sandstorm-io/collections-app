@@ -4,9 +4,7 @@ import ReactDOM from "react-dom";
 import Immutable from "immutable";
 import _ from "underscore";
 
-function Delete() {}
-
-function http(url: string, postData?: string | Blob | Delete): Promise<string> {
+function http(url: string, method, data): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.onload = () => {
@@ -17,13 +15,8 @@ function http(url: string, postData?: string | Blob | Delete): Promise<string> {
       }
     };
     xhr.onerror = (e: Error) => { reject(e); };
-    if (postData instanceof Delete) {
-      xhr.open("delete", url)
-      xhr.send();
-    } else {
-      xhr.open(postData ? "post" : "get", url)
-      xhr.send(postData);
-    }
+    xhr.open(method, url);
+    xhr.send(data);
   });
 }
 
@@ -82,7 +75,7 @@ function doRequest(serializedPowerboxDescriptor) {
     query: [serializedPowerboxDescriptor]
   }).then((response) => {
     console.log("response: " + JSON.stringify(response));
-    return http("/token/" + response.token, response.descriptor).then((response) => {
+    return http("/token/" + response.token, "post", response.descriptor).then((response) => {
       console.log("OK");
     });
   });
@@ -142,7 +135,7 @@ class GrainList extends React.Component {
 
   clickRemoveGrain(e) {
     for (let e of this.state.selectedGrains.keys()) {
-      http("/sturdyref/" + e, new Delete());
+      http("/sturdyref/" + e, "delete");
     }
 
     this.setState({ selectedGrains: Immutable.Set() });
@@ -201,7 +194,7 @@ class GrainList extends React.Component {
 
 class Description extends React.Component {
   props: { description: String, canWrite: bool };
-  state: { editing: bool };
+  state: { editing: bool, editedDescription: String };
 
   constructor(props) {
     super(props);
@@ -209,20 +202,23 @@ class Description extends React.Component {
   }
 
   clickEdit() {
-    this.setState({ editing: true });
+    this.setState({ editing: true, editedDescription: this.props.description });
   }
 
   submitEdit(e) {
     e.preventDefault();
-    console.log(e.target);
-    // TODO get the value and PUT it to the server
+    http("/description", "put", this.state.editedDescription);
     this.setState({ editing: false });
+  }
+
+  changeDesc(e) {
+    this.setState({ editedDescription: e.target.value });
   }
 
   render () {
     if (this.state.editing) {
       return <form onSubmit={this.submitEdit.bind(this)}>
-        <input type="text"></input>
+        <input type="text" onChange={this.changeDesc.bind(this)}></input>
         <button>done</button>
         </form>;
     } else {
