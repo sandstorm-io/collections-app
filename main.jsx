@@ -208,15 +208,37 @@ class Description extends React.Component {
     this.state = { editing: false };
   }
 
+  clickEdit() {
+    this.setState({ editing: true });
+  }
+
+  submitEdit(e) {
+    e.preventDefault();
+    console.log(e.target);
+    // TODO get the value and PUT it to the server
+    this.setState({ editing: false });
+  }
 
   render () {
-    return <p>short editable description</p>;
+    if (this.state.editing) {
+      return <form onSubmit={this.submitEdit.bind(this)}>
+        <input type="text"></input>
+        <button>done</button>
+        </form>;
+    } else {
+      const button = [];
+      if (this.props.canWrite) {
+        button.push(<button onClick={this.clickEdit.bind(this)}>edit</button>);
+      }
+      return <p>{this.props.description} {button}</p>;
+    }
   }
 }
 
 class Main extends React.Component {
   props: {};
   state: { canWrite: bool,
+           description: String,
            grains: Immutable.Map,
          };
 
@@ -235,6 +257,8 @@ class Main extends React.Component {
       const action = JSON.parse(m.data);
       if (action.canWrite) {
         this.setState({canWrite: action.canWrite});
+      } else if (action.description) {
+        this.setState({ description: action.description });
       } else if (action.insert) {
         console.log("insert!", action.insert);
         const newGrains = this.state.grains.set(action.insert.token,
@@ -251,7 +275,7 @@ class Main extends React.Component {
 
   render() {
 
-    return <div> <Description canWrite={this.state.canWrite}/>
+    return <div> <Description canWrite={this.state.canWrite} description={this.state.description}/>
       {this.state.canWrite ? <AddGrain/>: [] }
       <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
       </div>;

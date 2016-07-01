@@ -186,6 +186,7 @@ enum Action {
     Insert { token: String, data: SavedUiViewData },
     Remove { token: String },
     CanWrite(bool),
+    Description(String),
 }
 
 impl Action {
@@ -200,6 +201,9 @@ impl Action {
             }
             &Action::CanWrite(b) => {
                 format!("{{\"canWrite\":{}}}", b)
+            }
+            &Action::Description(ref s) => {
+                format!("{{\"description\":\"{}\"}}", s)
             }
         }
     }
@@ -220,6 +224,7 @@ pub struct SavedUiViewSet {
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
     tasks: ::gj::TaskSet<(), Error>,
+    description: String,
 }
 
 impl SavedUiViewSet {
@@ -254,12 +259,32 @@ impl SavedUiViewSet {
             map.insert(token, entry);
         }
 
+        let description = match ::std::fs::File::open("/var/description") {
+            Ok(mut f) => {
+                use std::io::Read;
+                let mut result = String::new();
+                f.read_to_string(&mut result);
+                result
+            }
+            Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => {
+                use std::io::Write;
+                let mut f = try!(::std::fs::File::create("/var/description"));
+                let result = "this is a description";
+                try!(f.write_all(result.as_bytes()));
+                result.into()
+            }
+            Err(e) => {
+                return Err(e.into());
+            }
+        };
+
         Ok(SavedUiViewSet {
             base_path: token_directory.as_ref().to_path_buf(),
             views: map,
             next_id: 0,
             subscribers: HashMap::new(),
             tasks: ::gj::TaskSet::new(Box::new(Reaper)),
+            description: description,
         })
     }
 
@@ -334,6 +359,14 @@ impl SavedUiViewSet {
 
         {
             let json_string = Action::CanWrite(can_write).to_json();
+            let mut req = client_stream.send_bytes_request();
+            encode_websocket_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task = task.then(|_| promise);
+        }
+
+        {
+            let json_string = Action::Description(set.borrow().description.clone()).to_json();
             let mut req = client_stream.send_bytes_request();
             encode_websocket_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
