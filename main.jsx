@@ -222,9 +222,9 @@ class Description extends React.Component {
         <button>done</button>
         </form>;
     } else {
-      const button = [];
+      let button = [];
       if (this.props.canWrite) {
-        button.push(<button onClick={this.clickEdit.bind(this)}>edit</button>);
+        button = <button key="hi" onClick={this.clickEdit.bind(this)}>edit</button>;
       }
       return <p>{this.props.description} {button}</p>;
     }
