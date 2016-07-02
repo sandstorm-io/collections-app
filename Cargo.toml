@@ -18,6 +18,5 @@ gjio = "0.1"
 capnp = "0.7"
 capnp-rpc = "0.7"
 rustc-serialize = "0.3.19"
+sandstorm = "0.0.3"
 
-[dependencies.sandstorm]
-path = "../sandstorm-rust"

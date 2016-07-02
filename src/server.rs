@@ -416,6 +416,7 @@ pub struct WebSession {
     timer: ::gjio::Timer,
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    context: session_context::Client,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
     identity_id: String,
 }
@@ -423,7 +424,7 @@ pub struct WebSession {
 impl WebSession {
     pub fn new(timer: ::gjio::Timer,
                user_info: user_info::Reader,
-               _context: session_context::Client,
+               context: session_context::Client,
                params: web_session::params::Reader,
                sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
                saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
@@ -437,6 +438,7 @@ impl WebSession {
             timer: timer,
             can_write: can_write,
             sandstorm_api: sandstorm_api,
+            context: context,
             saved_ui_views: saved_ui_views,
             identity_id: hex::ToHex::to_hex(try!(user_info.get_identity_id())),
         })
@@ -575,7 +577,7 @@ impl web_session::Server for WebSession {
         }
 
         // now let's save this thing into an actual uiview sturdyref
-        let mut req = self.sandstorm_api.claim_request_request();
+        let mut req = self.context.claim_request_request();
         let sandstorm_api = self.sandstorm_api.clone();
         req.get().set_request_token(token);
         let saved_ui_views = self.saved_ui_views.clone();
