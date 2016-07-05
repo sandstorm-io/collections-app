@@ -155,6 +155,11 @@ class GrainList extends React.Component {
     }
   }
 
+  offerUiView(token) {
+    console.log("offering token:", token);
+    http("/offer/" + token, "post");
+  }
+
   render() {
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
@@ -165,7 +170,7 @@ class GrainList extends React.Component {
             </td> :
             [] }
           <td></td>
-          <td className="click-to-go">
+          <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
           {e[1].title}
         </td>
           <td> {makeDateString(new Date(parseInt(e[1].date_added)))}</td>

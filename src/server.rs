@@ -593,6 +593,8 @@ impl WebSession {
                      mut results: web_session::PostResults)
                      -> Promise<(), Error>
     {
+        println!("offering ui view!");
+        let mut _content = results.get().init_content();
         Promise::ok(())
     }
 
