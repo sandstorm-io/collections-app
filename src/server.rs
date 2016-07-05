@@ -487,50 +487,10 @@ impl web_session::Server for WebSession {
             self.read_file("/script.js.gz", results, "text/javascript; charset=UTF-8", Some("gzip"))
         } else if path == "style.css" {
             self.read_file("/style.css.gz", results, "text/css; charset=UTF-8", Some("gzip"))
-        } else if path == "var" || path == "var/" {
-            // Return a listing of the directory contents, one per line.
-            let mut entries = Vec::new();
-            for entry in pry!(::std::fs::read_dir(path)) {
-                let entry = pry!(entry);
-                let name = entry.file_name().into_string().expect("bad file name");
-                if (&name != ".") && (&name != "..") {
-                    entries.push(name);
-                }
-            }
-
-            let text = entries.join("\n");
-            let mut response = results.get().init_content();
-            response.set_mime_type("text/plain");
-            response.init_body().set_bytes(text.as_bytes());
-            Promise::ok(())
-        } else if path.starts_with("var/") {
-            // Serve all files under /var with type application/octet-stream since it comes from the
-            // user. E.g. serving as "text/html" here would allow someone to trivially XSS other users
-            // of the grain by PUTing malicious HTML content. (Such an attack wouldn't be a huge deal:
-            // it would only allow the attacker to hijack another user's access to this grain, not to
-            // Sandstorm in general, and if they attacker already has write access to upload the
-            // malicious content, they have little to gain from hijacking another session.)
-            self.read_file(path, results, "application/octet-stream", None)
-        } else if path == "" || path.ends_with("/") {
-            // A directory. Serve "index.html".
-            self.read_file(&format!("client/{}index.html", path), results, "text/html; charset=UTF-8",
-                           None)
         } else {
-            // Request for a static file. Look for it under "client/".
-            let filename = format!("client/{}", path);
-
-            // Check if it's a directory.
-            if let Ok(true) = ::std::fs::metadata(&filename).map(|md| md.is_dir()) {
-                // It is. Return redirect to add '/'.
-                let mut redirect = results.get().init_redirect();
-                redirect.set_is_permanent(true);
-                redirect.set_switch_to_get(true);
-                redirect.set_location(&format!("{}/", path));
-                Promise::ok(())
-            } else {
-                // Regular file (or non-existent).
-                self.read_file(&filename, results, self.infer_content_type(path), None)
-            }
+            let mut error = results.get().init_client_error();
+            error.set_status_code(web_session::response::ClientErrorCode::NotFound);
+            Promise::ok(())
         }
     }
 
@@ -715,28 +675,6 @@ impl WebSession {
             }
         }
         Ok(())
-    }
-
-    fn infer_content_type(&self, filename: &str) -> &'static str {
-        if filename.ends_with(".html") {
-            "text/html; charset=UTF-8"
-        } else if filename.ends_with(".js") {
-            "text/javascript; charset=UTF-8"
-        } else if filename.ends_with(".css") {
-            "text/css; charset=UTF-8"
-        } else if filename.ends_with(".png") {
-            "image/png"
-        } else if filename.ends_with(".gif") {
-            "image/gif"
-        } else if filename.ends_with(".jpg") || filename.ends_with(".jpeg") {
-            "image/jpeg"
-        } else if filename.ends_with(".svg") {
-            "image/svg+xml; charset=UTF-8"
-        } else if filename.ends_with(".txt") {
-            "text/plain; charset=UTF-8"
-        } else {
-            "application/octet-stream"
-        }
     }
 
     fn read_file(&self,
