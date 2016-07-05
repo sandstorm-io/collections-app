@@ -159,13 +159,13 @@ class GrainList extends React.Component {
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
       grainRows.push(
-          <tr classNamme="grain" key={e[0]}>
+          <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
             <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
           <td></td>
-          <td>
+          <td className="click-to-go">
           {e[1].title}
         </td>
           <td> {makeDateString(new Date(parseInt(e[1].date_added)))}</td>
@@ -262,8 +262,6 @@ class Main extends React.Component {
 
     let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
     let ws = new WebSocket(wsProtocol + "://" + window.location.host);
-
-    // TODO: error handling / reconnect
 
     ws.onopen = (e) => {
       this.setState({ socketReadyState: "open" });
