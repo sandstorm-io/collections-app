@@ -425,7 +425,7 @@ impl WebSession {
     pub fn new(timer: ::gjio::Timer,
                user_info: user_info::Reader,
                context: session_context::Client,
-               params: web_session::params::Reader,
+               _params: web_session::params::Reader,
                sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
                saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
                -> ::capnp::Result<WebSession>
@@ -588,14 +588,42 @@ impl web_session::Server for WebSession {
 
 impl WebSession {
     fn offer_ui_view(&mut self,
-                     token: String,
-                     params: web_session::PostParams,
+                     text_token: String,
+                     _params: web_session::PostParams,
                      mut results: web_session::PostResults)
                      -> Promise<(), Error>
     {
-        println!("offering ui view!");
-        let mut _content = results.get().init_content();
-        Promise::ok(())
+        let token = match base64::FromBase64::from_base64(&text_token[..]) {
+            Ok(b) => b,
+            Err(e) => return Promise::err(Error::failed(format!("{}", e))),
+        };
+
+        let session_context = self.context.clone();
+        let mut req = self.sandstorm_api.restore_request();
+        req.get().set_token(&token);
+        req.send().promise.then(move |response| {
+            let sealed_ui_view: ui_view::Client =
+                pry!(pry!(response.get()).get_cap().get_as_capability());
+            let mut req = session_context.offer_request();
+            req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+            {
+                use capnp::traits::HasTypeId;
+                let tags = req.get().init_descriptor().init_tags(1);
+                tags.get(0).set_id(ui_view::Client::type_id());
+            }
+
+            req.send().promise
+        }).then_else(move |r| match r {
+            Ok(_) => {
+                results.get().init_no_content();
+                Promise::ok(())
+            }
+            Err(e) => {
+                let mut client_error = results.get().init_client_error();
+                client_error.set_description_html(&format!("{}", e)[..]);
+                Promise::ok(())
+            }
+        })
     }
 
     fn receive_request_token(&mut self,
