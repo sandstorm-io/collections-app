@@ -499,98 +499,23 @@ impl web_session::Server for WebSession {
             mut results: web_session::PostResults)
             -> Promise<(), Error>
     {
-        let path = pry!(pry!(params.get()).get_path());
-        pry!(self.require_canonical_path(path));
+        let path = {
+            let path = pry!(pry!(params.get()).get_path());
+            pry!(self.require_canonical_path(path));
+            path.to_string()
+        };
 
-        let token = if path.starts_with("token/") {
-            &path[6..]
+        if path.starts_with("token/") {
+            self.receive_request_token(
+                path[6..].to_string(),
+                params, results)
+        } else if path.starts_with("offer/") {
+            self.offer_ui_view(path[6..].to_string(), params, results)
         } else {
             let mut error = results.get().init_client_error();
             error.set_status_code(web_session::response::ClientErrorCode::NotFound);
-            return Promise::ok(())
-        };
-
-        println!("token: {}", token);
-
-        let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
-
-        let decoded_content = match base64::FromBase64::from_base64(content) {
-            Ok(c) => c,
-            Err(_) => {
-                // XXX should return a 400 error
-                return Promise::err(Error::failed("failed to convert from base64".into()));
-            }
-        };
-        let mut grain_title: String = String::new();
-        {
-            let mut cursor = ::std::io::Cursor::new(decoded_content);
-            let message = pry!(::capnp::serialize_packed::read_message(&mut cursor,
-                                                                       Default::default()));
-            let desc: powerbox_descriptor::Reader = pry!(message.get_root());
-            for tag in pry!(desc.get_tags()).iter() {
-                println!("tag {}", tag.get_id());
-                let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
-                grain_title = pry!(value.get_title()).into();
-                println!("grain title: {}", grain_title);
-
-            }
+            Promise::ok(())
         }
-
-        // now let's save this thing into an actual uiview sturdyref
-        let mut req = self.context.claim_request_request();
-        let sandstorm_api = self.sandstorm_api.clone();
-        req.get().set_request_token(token);
-        let saved_ui_views = self.saved_ui_views.clone();
-        let identity_id = self.identity_id.clone();
-        let do_stuff = req.send().promise.then(move |response| {
-            println!("restored!");
-            let sealed_ui_view: ui_view::Client =
-                pry!(pry!(response.get()).get_cap().get_as_capability());
-            println!("got the cap!");
-            sealed_ui_view.get_view_info_request().send().promise.then(move |response| {
-                println!("got viewinfo");
-                let view_info = pry!(response.get());
-                let title = pry!(view_info.get_app_title());
-                println!("app title: {}", pry!(title.get_default_text()));
-
-                let icon = pry!(view_info.get_grain_icon());
-                icon.get_url_request().send().promise.then(move |response| {
-                    let response = pry!(response.get());
-                    let protocol = match pry!(response.get_protocol()) {
-                        static_asset::Protocol::Https => "https".to_string(),
-                        static_asset::Protocol::Http => "http".to_string(),
-                    };
-                    let host_path = pry!(response.get_host_path());
-                    let url = format!("{}://{}", protocol, host_path);
-                    println!("grain icon url: {}", url);
-
-                    let mut req = sandstorm_api.save_request();
-                    req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
-                    {
-                        let mut save_label = req.get().init_label();
-                        save_label.set_default_text("[save label chosen by collections app]");
-                    }
-                    req.send().promise.map(move |response| {
-                        let token = try!(try!(response.get()).get_token());
-
-                        try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
-                        Ok(())
-                    })
-                })
-            })
-        });
-
-        do_stuff.then_else(move |r| match r {
-            Ok(()) => {
-                let mut _content = results.get().init_content();
-                Promise::ok(())
-            }
-            Err(e) => {
-                let mut error = results.get().init_client_error();
-                error.set_description_html(&format!("error: {:?}", e));
-                Promise::ok(())
-            }
-        })
     }
 
     fn put(&mut self,
@@ -662,6 +587,104 @@ impl web_session::Server for WebSession {
 }
 
 impl WebSession {
+    fn offer_ui_view(&mut self,
+                     token: String,
+                     params: web_session::PostParams,
+                     mut results: web_session::PostResults)
+                     -> Promise<(), Error>
+    {
+        Promise::ok(())
+    }
+
+    fn receive_request_token(&mut self,
+                             token: String,
+                             params: web_session::PostParams,
+                             mut results: web_session::PostResults)
+                             -> Promise<(), Error>
+    {
+        println!("token: {}", token);
+
+        let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
+
+        let decoded_content = match base64::FromBase64::from_base64(content) {
+            Ok(c) => c,
+            Err(_) => {
+                // XXX should return a 400 error
+                return Promise::err(Error::failed("failed to convert from base64".into()));
+            }
+        };
+        let mut grain_title: String = String::new();
+        {
+            let mut cursor = ::std::io::Cursor::new(decoded_content);
+            let message = pry!(::capnp::serialize_packed::read_message(&mut cursor,
+                                                                       Default::default()));
+            let desc: powerbox_descriptor::Reader = pry!(message.get_root());
+            for tag in pry!(desc.get_tags()).iter() {
+                println!("tag {}", tag.get_id());
+                let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
+                grain_title = pry!(value.get_title()).into();
+                println!("grain title: {}", grain_title);
+
+            }
+        }
+
+        // now let's save this thing into an actual uiview sturdyref
+        let mut req = self.context.claim_request_request();
+        let sandstorm_api = self.sandstorm_api.clone();
+        req.get().set_request_token(&token[..]);
+        let saved_ui_views = self.saved_ui_views.clone();
+        let identity_id = self.identity_id.clone();
+        let do_stuff = req.send().promise.then(move |response| {
+            println!("restored!");
+            let sealed_ui_view: ui_view::Client =
+                pry!(pry!(response.get()).get_cap().get_as_capability());
+            println!("got the cap!");
+            sealed_ui_view.get_view_info_request().send().promise.then(move |response| {
+                println!("got viewinfo");
+                let view_info = pry!(response.get());
+                let title = pry!(view_info.get_app_title());
+                println!("app title: {}", pry!(title.get_default_text()));
+
+                let icon = pry!(view_info.get_grain_icon());
+                icon.get_url_request().send().promise.then(move |response| {
+                    let response = pry!(response.get());
+                    let protocol = match pry!(response.get_protocol()) {
+                        static_asset::Protocol::Https => "https".to_string(),
+                        static_asset::Protocol::Http => "http".to_string(),
+                    };
+                    let host_path = pry!(response.get_host_path());
+                    let url = format!("{}://{}", protocol, host_path);
+                    println!("grain icon url: {}", url);
+
+                    let mut req = sandstorm_api.save_request();
+                    req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+                    {
+                        let mut save_label = req.get().init_label();
+                        save_label.set_default_text("[save label chosen by collections app]");
+                    }
+                    req.send().promise.map(move |response| {
+                        let token = try!(try!(response.get()).get_token());
+
+                        try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
+                        Ok(())
+                    })
+                })
+            })
+        });
+
+        do_stuff.then_else(move |r| match r {
+            Ok(()) => {
+                let mut _content = results.get().init_content();
+                Promise::ok(())
+            }
+            Err(e) => {
+                let mut error = results.get().init_client_error();
+                error.set_description_html(&format!("error: {:?}", e));
+                Promise::ok(())
+            }
+        })
+    }
+
     fn require_canonical_path(&self, path: &str) -> Result<(), Error> {
         // Require that the path doesn't contain "." or ".." or consecutive slashes, to prevent path
         // injection attacks.
