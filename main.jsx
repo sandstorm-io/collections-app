@@ -125,7 +125,9 @@ function makeDateString(date) {
 };
 
 class GrainList extends React.Component {
-  props: { grains: Immutable.Map };
+  props: { grains: Immutable.Map,
+           canWrite: bool,
+         };
   state: { selectedGrains: Immutable.Set };
 
   constructor(props) {
@@ -158,8 +160,10 @@ class GrainList extends React.Component {
     for (let e of this.props.grains.entries()) {
       grainRows.push(
           <tr classNamme="grain" key={e[0]}>
-          <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
-          </td>
+          { this.props.canWrite ?
+            <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
+            </td> :
+            [] }
           <td></td>
           <td>
           {e[1].title}
@@ -170,14 +174,22 @@ class GrainList extends React.Component {
       );
     }
 
+    const bulkActionButtons = [];
+    if (this.props.canWrite) {
+      bulkActionButtons.push(
+          <button key="unlink"
+                  onClick={this.clickRemoveGrain.bind(this)}>Unlink from collection... </button>);
+    }
+
     return <div className="grain-list">
-      <button onClick={this.clickRemoveGrain.bind(this)}> Unlink from collection... </button>
-        <table className="grain-list-table">
+      {bulkActionButtons}
+      <table className="grain-list-table">
           <thead>
-            <tr>
+           <tr>
+         {this.props.canWrite ?
               <td className="select-all-grains">
                 <input type="checkbox"/>
-              </td>
+       </td> : [] }
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
               <td className="date-added">Date added</td>
