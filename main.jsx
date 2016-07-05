@@ -248,17 +248,38 @@ class Main extends React.Component {
   state: { canWrite: bool,
            description: String,
            grains: Immutable.Map,
+           socketReadyState: String,
          };
 
   constructor(props) {
     super(props);
     this.state = { grains: Immutable.Map() };
+    this.openWebSocket(0);
+  }
 
+  openWebSocket(delay) {
+    this.setState({socketReadyState: "connecting" });
 
     let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
     let ws = new WebSocket(wsProtocol + "://" + window.location.host);
 
     // TODO: error handling / reconnect
+
+    ws.onopen = (e) => {
+      this.setState({ socketReadyState: "open" });
+    };
+
+    ws.onerror = (e) => {
+      console.log("websocket got error: ", e);
+    };
+
+    ws.onclose = (e) => {
+      console.log("websocket closed: ", e);
+      this.setState({ socketReadyState: "closed" });
+
+      // TODO delay
+      this.openWebSocket(0);
+    };
 
     ws.onmessage = (m) => {
       console.log("websocket got message: ", m.data);
@@ -277,13 +298,15 @@ class Main extends React.Component {
         const newGrains = this.state.grains.delete(action.remove.token);
         this.setState({grains: newGrains});
       }
-    }
+    };
 
   }
 
   render() {
 
-    return <div> <Description canWrite={this.state.canWrite} description={this.state.description}/>
+    return <div>
+      <p>socket state: {this.state.socketReadyState}</p>
+      <Description canWrite={this.state.canWrite} description={this.state.description}/>
       {this.state.canWrite ? <AddGrain/>: [] }
       <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
       </div>;
