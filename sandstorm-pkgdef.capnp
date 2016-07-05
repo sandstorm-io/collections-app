@@ -11,7 +11,8 @@ const pkgdef :Spk.PackageDefinition = (
     appMarketingVersion = (defaultText = "0.0.0"),
 
     actions = [
-      ( nounPhrase = (defaultText = "collection"),
+      ( title = (defaultText = "new collection"),
+        nounPhrase = (defaultText = "collection"),
         command = .myCommand
         # The command to run when starting for the first time. (".myCommand"
         # is just a constant defined at the bottom of the file.)
