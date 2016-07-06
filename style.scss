@@ -138,6 +138,20 @@ $grainlist-table-row-outline-color: #d3d3d3;
 }
 
 
+body {
+  padding: 0;
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  font-family: "Source Sans Pro", sans-serif;
+  font-weight: normal;
+  background-color: white;
+  &.modal-shown {
+    // When a modal is being shown, make it so only the modal scrolls.
+    overflow-y: hidden;
+  }
+}
+
 .grain-list {
   overflow: auto;
   padding: 0px 32px;
