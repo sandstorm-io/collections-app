@@ -65,7 +65,7 @@ const interfaces = {
   // This is produced by:
   // urlsafeBase64(capnp.serializePacked(PowerboxDescriptor, {
   //   tags: [
-  //     { id: IpNetwork.typeId },
+  //     { id: UiView.typeId },
   //   ],
   // }))
 };
