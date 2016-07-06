@@ -147,7 +147,6 @@ class GrainList extends React.Component {
   selectGrain(e) {
     const token = e.target.getAttribute("data-token");
     console.log("select grain", token);
-    console.log("target.value:", );
     if (e.target.checked) {
       this.setState({ selectedGrains: this.state.selectedGrains.add(token) });
     } else {
