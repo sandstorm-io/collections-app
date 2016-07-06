@@ -328,40 +328,17 @@ $grainlist-table-row-outline-color: #d3d3d3;
         }
       }
     }
-    &.action {
-      cursor: pointer;
-      background-color: $grainlist-table-row-action-background-color;
-      &:hover {
-        background-color: $grainlist-table-row-action-background-color-hover;
-        >td>.new-grain-icon {
-          background-image: url("/plus-6A237C.svg");
-        }
-      }
-      >td.td-app-icon {
-        font-weight: bold;
-        font-size: 32px;
-        color: #9E40B5;
-      }
-      >td {
-        >.new-grain-icon {
-          @extend %pseudo-img-tag;
-          width: 24px;
-          height: 24px;
-          background-image: url("/plus-9E40B5.svg");
-        }
-      }
-      button {
-        color: black;
-        font-weight: bold;
-        @extend %unstyled-button;
-      }
-    }
     &.grain {
       .click-to-go {
         cursor: pointer;
       }
       &:hover {
         background-color: $grainlist-table-row-background-color-hover;
+      }
+
+      td>img.grain-icon {
+        width: 24px;
+        height: 24px;
       }
     }
   }

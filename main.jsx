@@ -126,6 +126,7 @@ function makeDateString(date) {
 
 class GrainList extends React.Component {
   props: { grains: Immutable.Map,
+           viewInfos: Immutable.Map,
            canWrite: bool,
          };
   state: { selectedGrains: Immutable.Set };
@@ -162,13 +163,17 @@ class GrainList extends React.Component {
   render() {
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
+      const info = this.props.viewInfos.get(e[0]) || {};
+//      if (info.grain_icon_url)
       grainRows.push(
           <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
             <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
-          <td></td>
+          <td>
+          <img title={info.app_title} src={info.grain_icon_url} className="grain-icon"></img>
+          </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
           {e[1].title}
         </td>
@@ -254,12 +259,15 @@ class Main extends React.Component {
   state: { canWrite: bool,
            description: String,
            grains: Immutable.Map,
+           viewInfos: Immutable.Map,
            socketReadyState: String,
          };
 
   constructor(props) {
     super(props);
-    this.state = { grains: Immutable.Map() };
+    this.state = { grains: Immutable.Map(),
+                   viewInfos: Immutable.Map(),
+                 };
     this.openWebSocket(0);
   }
 
@@ -293,14 +301,16 @@ class Main extends React.Component {
       } else if (action.description) {
         this.setState({ description: action.description });
       } else if (action.insert) {
-        console.log("insert!", action.insert);
         const newGrains = this.state.grains.set(action.insert.token,
                                                 action.insert.data);
         this.setState({grains: newGrains});
       } else if (action.remove) {
-        console.log("remove! ", action.remove.token);
         const newGrains = this.state.grains.delete(action.remove.token);
-        this.setState({grains: newGrains});
+        this.setState({ grains: newGrains });
+      } else if (action.viewInfo) {
+        const newViewInfos = this.state.viewInfos.set(action.viewInfo.token,
+                                                      action.viewInfo.data);
+        this.setState({ viewInfos: newViewInfos });
       }
     };
 
@@ -312,7 +322,8 @@ class Main extends React.Component {
       <p>socket state: {this.state.socketReadyState}</p>
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
       {this.state.canWrite ? <AddGrain/>: [] }
-      <GrainList grains={this.state.grains} canWrite={this.state.canWrite}/>
+      <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
+                 canWrite={this.state.canWrite}/>
       </div>;
   }
 }

@@ -212,7 +212,7 @@ impl Action {
                 format!("{{\"remove\":{{\"token\":\"{}\"}}}}", token)
             }
             &Action::ViewInfo { ref token, ref data } => {
-                format!("{{\"insert\":{{\"token\":\"{}\",\"data\":{} }} }}",
+                format!("{{\"viewInfo\":{{\"token\":\"{}\",\"data\":{} }} }}",
                         token, data.to_json())
             }
             &Action::CanWrite(b) => {
@@ -304,7 +304,9 @@ impl SavedUiViewSet {
                 added_by: try!(metadata.get_added_by()).into(),
             };
 
-            result.borrow_mut().views.insert(token, entry);
+            result.borrow_mut().views.insert(token.clone(), entry);
+
+            try!(SavedUiViewSet::retrieve_view_info(&result, token));
         }
 
         Ok(result)
@@ -377,10 +379,9 @@ impl SavedUiViewSet {
     }
 
     fn insert(&mut self,
-              binary_token: &[u8],
+              token: String,
               title: String,
               added_by: String) -> ::capnp::Result<()> {
-        let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
         let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
@@ -467,6 +468,19 @@ impl SavedUiViewSet {
             let action = Action::Insert {
                 token: t.clone(),
                 data: v.clone()
+            };
+
+            let json_string = action.to_json();
+            let mut req = client_stream.send_bytes_request();
+            encode_websocket_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task = task.then(|_| promise);
+        }
+
+        for (t, vi) in &set.borrow().view_infos {
+            let action = Action::ViewInfo {
+                token: t.clone(),
+                data: vi.clone()
             };
 
             let json_string = action.to_json();
@@ -739,36 +753,21 @@ impl WebSession {
             let sealed_ui_view: ui_view::Client =
                 pry!(pry!(response.get()).get_cap().get_as_capability());
             println!("got the cap!");
-            sealed_ui_view.get_view_info_request().send().promise.then(move |response| {
-                println!("got viewinfo");
-                let view_info = pry!(response.get());
-                let title = pry!(view_info.get_app_title());
-                println!("app title: {}", pry!(title.get_default_text()));
 
-                let icon = pry!(view_info.get_grain_icon());
-                icon.get_url_request().send().promise.then(move |response| {
-                    let response = pry!(response.get());
-                    let protocol = match pry!(response.get_protocol()) {
-                        static_asset::Protocol::Https => "https".to_string(),
-                        static_asset::Protocol::Http => "http".to_string(),
-                    };
-                    let host_path = pry!(response.get_host_path());
-                    let url = format!("{}://{}", protocol, host_path);
-                    println!("grain icon url: {}", url);
+            let mut req = sandstorm_api.save_request();
+            req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+            {
+                let mut save_label = req.get().init_label();
+                save_label.set_default_text("[save label chosen by collections app]");
+            }
+            req.send().promise.map(move |response| {
+                let binary_token = try!(try!(response.get()).get_token());
+                let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
 
-                    let mut req = sandstorm_api.save_request();
-                    req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
-                    {
-                        let mut save_label = req.get().init_label();
-                        save_label.set_default_text("[save label chosen by collections app]");
-                    }
-                    req.send().promise.map(move |response| {
-                        let token = try!(try!(response.get()).get_token());
+                try!(saved_ui_views.borrow_mut().insert(token.clone(), grain_title, identity_id));
 
-                        try!(saved_ui_views.borrow_mut().insert(token, grain_title, identity_id));
-                        Ok(())
-                    })
-                })
+                try!(SavedUiViewSet::retrieve_view_info(&saved_ui_views, token));
+                Ok(())
             })
         });
 
