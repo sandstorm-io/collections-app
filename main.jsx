@@ -234,7 +234,9 @@ class Description extends React.Component {
   render () {
     if (this.state.editing) {
       return <form onSubmit={this.submitEdit.bind(this)}>
-        <input type="text" onChange={this.changeDesc.bind(this)}></input>
+        <input type="text" onChange={this.changeDesc.bind(this)}
+               defaultValue={this.props.description}>
+        </input>
         <button>done</button>
         </form>;
     } else {

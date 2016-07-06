@@ -38,7 +38,6 @@ use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
 pub struct WebSocketStream {
     id: u64,
-    client_stream: web_socket_stream::Client,
     awaiting_pong: Rc<Cell<bool>>,
     _ping_pong_promise: Promise<(), Error>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
@@ -79,7 +78,7 @@ impl WebSocketStream {
            -> WebSocketStream
     {
         let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = do_ping_pong(client_stream.clone(),
+        let ping_pong_promise = do_ping_pong(client_stream,
                                              timer,
                                              awaiting.clone()).map_else(|r| match r {
             Ok(_) => Ok(()),
@@ -88,7 +87,6 @@ impl WebSocketStream {
 
         WebSocketStream {
             id: id,
-            client_stream: client_stream,
             awaiting_pong: awaiting,
             _ping_pong_promise: ping_pong_promise,
             saved_ui_views: saved_ui_views,
@@ -170,6 +168,8 @@ struct SavedUiViewData {
     title: String,
     date_added: u64,
     added_by: String,
+//    app_title: String,
+//    grain_icon_url: String,
 }
 
 impl SavedUiViewData {
@@ -228,7 +228,7 @@ pub struct SavedUiViewSet {
 }
 
 impl SavedUiViewSet {
-    pub fn new<P>(token_directory: P) -> ::capnp::Result<SavedUiViewSet>
+    pub fn new<P>(token_directory: P) -> ::capnp::Result<Rc<RefCell<SavedUiViewSet>>>
         where P: AsRef<::std::path::Path>
     {
         // create token directory if it does not yet exist
@@ -263,7 +263,7 @@ impl SavedUiViewSet {
             Ok(mut f) => {
                 use std::io::Read;
                 let mut result = String::new();
-                f.read_to_string(&mut result);
+                try!(f.read_to_string(&mut result));
                 result
             }
             Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => {
@@ -278,15 +278,20 @@ impl SavedUiViewSet {
             }
         };
 
-        Ok(SavedUiViewSet {
+        let result = Rc::new(RefCell::new(SavedUiViewSet {
             base_path: token_directory.as_ref().to_path_buf(),
             views: map,
             next_id: 0,
             subscribers: HashMap::new(),
             tasks: ::gj::TaskSet::new(Box::new(Reaper)),
             description: description,
-        })
+        }));
+
+        Ok(result)
     }
+
+//    fn insert_internal() {
+//    }
 
     fn update_description(&mut self, description: &[u8]) -> ::capnp::Result<()> {
         use std::io::Write;
@@ -308,7 +313,9 @@ impl SavedUiViewSet {
         Ok(())
     }
 
-    fn insert(&mut self, binary_token: &[u8], title: String,
+    fn insert(&mut self,
+              binary_token: &[u8],
+              title: String,
               added_by: String) -> ::capnp::Result<()> {
         let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
         let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
@@ -770,12 +777,12 @@ pub struct UiView {
 impl UiView {
     fn new(timer: ::gjio::Timer,
            client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-           saved_ui_views: SavedUiViewSet) -> UiView
+           saved_ui_views: Rc<RefCell<SavedUiViewSet>>) -> UiView
     {
         UiView {
             timer: timer,
             sandstorm_api: client,
-            saved_ui_views: Rc::new(RefCell::new(saved_ui_views)),
+            saved_ui_views: saved_ui_views,
         }
     }
 }
