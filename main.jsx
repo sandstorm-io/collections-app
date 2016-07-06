@@ -155,6 +155,18 @@ class GrainList extends React.Component {
     }
   }
 
+  clickCheckboxContainer(e) {
+    if (e.target.tagName === "TD") {
+      for (let ii = 0; ii < e.target.children.length; ++ii) {
+        const c = e.target.children[ii];
+        if (c.tagName === "INPUT") {
+          c.click();
+          return;
+        }
+      }
+    }
+  }
+
   offerUiView(token) {
     console.log("offering token:", token);
     http("/offer/" + token, "post");
@@ -168,7 +180,8 @@ class GrainList extends React.Component {
       grainRows.push(
           <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
-            <td><input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
+            <td onClick={this.clickCheckboxContainer.bind(this)}>
+              <input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
           <td>
@@ -196,7 +209,8 @@ class GrainList extends React.Component {
           <thead>
            <tr>
          {this.props.canWrite ?
-              <td className="select-all-grains">
+            <td onClick={this.clickCheckboxContainer.bind(this)}
+              className="select-all-grains">
                 <input type="checkbox"/>
        </td> : [] }
               <td className="td-app-icon"></td>
