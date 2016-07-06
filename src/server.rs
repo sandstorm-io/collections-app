@@ -168,8 +168,6 @@ struct SavedUiViewData {
     title: String,
     date_added: u64,
     added_by: String,
-//    app_title: String,
-//    grain_icon_url: String,
 }
 
 impl SavedUiViewData {
@@ -182,9 +180,23 @@ impl SavedUiViewData {
 }
 
 #[derive(Clone)]
+struct ViewInfoData {
+    app_title: String,
+    grain_icon_url: String,
+}
+
+impl ViewInfoData {
+    fn to_json(&self) -> String {
+        format!("{{\"app_title\":\"{}\",\"grain_icon_url\":\"{}\"}}",
+                self.app_title, self.grain_icon_url)
+    }
+}
+
+#[derive(Clone)]
 enum Action {
     Insert { token: String, data: SavedUiViewData },
     Remove { token: String },
+    ViewInfo { token: String, data: ViewInfoData },
     CanWrite(bool),
     Description(String),
 }
@@ -198,6 +210,10 @@ impl Action {
             }
             &Action::Remove { ref token } => {
                 format!("{{\"remove\":{{\"token\":\"{}\"}}}}", token)
+            }
+            &Action::ViewInfo { ref token, ref data } => {
+                format!("{{\"insert\":{{\"token\":\"{}\",\"data\":{} }} }}",
+                        token, data.to_json())
             }
             &Action::CanWrite(b) => {
                 format!("{{\"canWrite\":{}}}", b)
@@ -221,44 +237,20 @@ impl ::gj::TaskReaper<(), Error> for Reaper {
 pub struct SavedUiViewSet {
     base_path: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
+    view_infos: HashMap<String, ViewInfoData>,
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
     tasks: ::gj::TaskSet<(), Error>,
     description: String,
+    sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
 }
 
 impl SavedUiViewSet {
-    pub fn new<P>(token_directory: P) -> ::capnp::Result<Rc<RefCell<SavedUiViewSet>>>
+    pub fn new<P>(token_directory: P,
+                  sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
+                  -> ::capnp::Result<Rc<RefCell<SavedUiViewSet>>>
         where P: AsRef<::std::path::Path>
     {
-        // create token directory if it does not yet exist
-        try!(::std::fs::create_dir_all(&token_directory));
-
-        let mut map = HashMap::new();
-
-        for token_file in try!(::std::fs::read_dir(&token_directory)) {
-            let dir_entry = try!(token_file);
-            let token: String = match dir_entry.file_name().to_str() {
-                None => {
-                    println!("malformed token: {:?}", dir_entry.file_name());
-                    continue
-                }
-                Some(s) => s.into(),
-            };
-
-            let mut reader = try!(::std::fs::File::open(dir_entry.path()));
-            let message = try!(::capnp::serialize::read_message(&mut reader, Default::default()));
-            let metadata: ui_view_metadata::Reader = try!(message.get_root());
-
-            let entry = SavedUiViewData {
-                title: try!(metadata.get_title()).into(),
-                date_added: metadata.get_date_added(),
-                added_by: try!(metadata.get_added_by()).into(),
-            };
-
-            map.insert(token, entry);
-        }
-
         let description = match ::std::fs::File::open("/var/description") {
             Ok(mut f) => {
                 use std::io::Read;
@@ -280,18 +272,89 @@ impl SavedUiViewSet {
 
         let result = Rc::new(RefCell::new(SavedUiViewSet {
             base_path: token_directory.as_ref().to_path_buf(),
-            views: map,
+            views: HashMap::new(),
+            view_infos: HashMap::new(),
             next_id: 0,
             subscribers: HashMap::new(),
             tasks: ::gj::TaskSet::new(Box::new(Reaper)),
             description: description,
+            sandstorm_api: sandstorm_api,
         }));
+
+        // create token directory if it does not yet exist
+        try!(::std::fs::create_dir_all(&token_directory));
+
+        for token_file in try!(::std::fs::read_dir(&token_directory)) {
+            let dir_entry = try!(token_file);
+            let token: String = match dir_entry.file_name().to_str() {
+                None => {
+                    println!("malformed token: {:?}", dir_entry.file_name());
+                    continue
+                }
+                Some(s) => s.into(),
+            };
+
+            let mut reader = try!(::std::fs::File::open(dir_entry.path()));
+            let message = try!(::capnp::serialize::read_message(&mut reader, Default::default()));
+            let metadata: ui_view_metadata::Reader = try!(message.get_root());
+
+            let entry = SavedUiViewData {
+                title: try!(metadata.get_title()).into(),
+                date_added: metadata.get_date_added(),
+                added_by: try!(metadata.get_added_by()).into(),
+            };
+
+            result.borrow_mut().views.insert(token, entry);
+        }
 
         Ok(result)
     }
 
-//    fn insert_internal() {
-//    }
+    fn retrieve_view_info(set_ref: &Rc<RefCell<SavedUiViewSet>>,
+                          token: String) -> ::capnp::Result<()> {
+        // SandstormApi.restore, then call getViewInfo,
+        // then call get_url() on the grain static asset.
+
+        let set = set_ref.clone();
+        let binary_token = match base64::FromBase64::from_base64(&token[..]) {
+            Ok(b) => b,
+            Err(e) => return Err(Error::failed(format!("{}", e))),
+        };
+
+        let mut req = set.borrow().sandstorm_api.restore_request();
+        req.get().set_token(&binary_token);
+        let task = req.send().promise.then(move |response| {
+            let view: ui_view::Client =
+                pry!(pry!(response.get()).get_cap().get_as_capability());
+            view.get_view_info_request().send().promise.then(move |response| {
+                let view_info = pry!(response.get());
+                let app_title = pry!(pry!(view_info.get_app_title()).get_default_text()).to_string();
+                let asset = pry!(view_info.get_grain_icon());
+                asset.get_url_request().send().promise.then(move |response| {
+                    let result = pry!(response.get());
+                    let protocol = match pry!(result.get_protocol()) {
+                        static_asset::Protocol::Https => "https".to_string(),
+                        static_asset::Protocol::Http => "http".to_string(),
+                    };
+
+                    let info = ViewInfoData {
+                        app_title: app_title,
+                        grain_icon_url: format!("{}://{}", protocol, pry!(result.get_host_path())),
+                    };
+
+                    set.borrow_mut().view_infos.insert(token.clone(), info.clone());
+
+                    let json_string = Action::ViewInfo { token: token, data: info }.to_json();
+                    set.borrow_mut().send_message_to_subscribers(&json_string);
+
+                    Promise::ok(())
+                })
+            })
+        });
+
+        set_ref.borrow_mut().tasks.add(task);
+        Ok(())
+    }
 
     fn update_description(&mut self, description: &[u8]) -> ::capnp::Result<()> {
         use std::io::Write;
@@ -857,12 +920,15 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         // sandstorm launches us with a connection on file descriptor 3
 	    let stream = try!(unsafe { network.wrap_raw_socket_descriptor(3) });
 
-        let saved_uiviews = try!(SavedUiViewSet::new("/var/sturdyrefs"));
-
         let (p, f) = Promise::and_fulfiller();
+        let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
+            ::capnp_rpc::new_promise_client(p);
+        let saved_uiviews = try!(SavedUiViewSet::new("/var/sturdyrefs", sandstorm_api.clone()));
+
+
         let uiview = UiView::new(
             event_port.get_timer(),
-            ::capnp_rpc::new_promise_client(p),
+            sandstorm_api,
             saved_uiviews);
 
         let client = ui_view::ToClient::new(uiview).from_server::<::capnp_rpc::Server>();
