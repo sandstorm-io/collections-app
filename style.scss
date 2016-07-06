@@ -197,7 +197,7 @@ $grainlist-table-row-outline-color: #d3d3d3;
     clear: right;
     >button {
       @extend %button-base;
-      @extend %button-secondary;
+      @extend %button-primary;
       display: inline-block;
       float: right;
       font-size: 14pt;

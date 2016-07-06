@@ -91,7 +91,6 @@ class AddGrain extends React.Component {
   }
 
   handleClick(event) {
-    console.log("clicked add grain");
     doRequest(interfaces.uiView);
   }
 
@@ -167,6 +166,10 @@ class GrainList extends React.Component {
     }
   }
 
+  selectAll(e) {
+    console.log("select all!");
+  }
+
   offerUiView(token) {
     console.log("offering token:", token);
     http("/offer/" + token, "post");
@@ -204,15 +207,19 @@ class GrainList extends React.Component {
     }
 
     return <div className="grain-list">
+      <div className="bulk-action-buttons">
       {bulkActionButtons}
+    </div>
+      <div className="buttons"> {this.props.canWrite ? <AddGrain/>: [] } </div>
+
       <table className="grain-list-table">
           <thead>
            <tr>
          {this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}
               className="select-all-grains">
-                <input type="checkbox"/>
-       </td> : [] }
+          <input type="checkbox" onChange={this.selectAll.bind(this)}/>
+           </td> : [] }
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
               <td className="date-added">Date added</td>
@@ -335,7 +342,7 @@ class Main extends React.Component {
     return <div>
       <p>socket state: {this.state.socketReadyState}</p>
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
-      {this.state.canWrite ? <AddGrain/>: [] }
+      <input className="search-bar" type="text" placeholder="search"/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
                  canWrite={this.state.canWrite}/>
       </div>;
