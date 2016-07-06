@@ -164,7 +164,7 @@ class GrainList extends React.Component {
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
       const info = this.props.viewInfos.get(e[0]) || {};
-//      if (info.grain_icon_url)
+//      if (info.grainIconUrl)
       grainRows.push(
           <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
@@ -172,13 +172,13 @@ class GrainList extends React.Component {
             </td> :
             [] }
           <td>
-          <img title={info.app_title} src={info.grain_icon_url} className="grain-icon"></img>
+          <img title={info.appTitle} src={info.grainIconUrl} className="grain-icon"></img>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
           {e[1].title}
         </td>
-          <td> {makeDateString(new Date(parseInt(e[1].date_added)))}</td>
-          <td> {e[1].added_by}</td>
+          <td> {makeDateString(new Date(parseInt(e[1].dateAdded)))}</td>
+          <td> {e[1].addedBy}</td>
           </tr>
       );
     }

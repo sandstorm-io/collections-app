@@ -172,7 +172,7 @@ struct SavedUiViewData {
 
 impl SavedUiViewData {
     fn to_json(&self) -> String {
-        format!("{{\"title\":\"{}\",\"date_added\": \"{}\",\"added_by\":\"{}\"}}",
+        format!("{{\"title\":\"{}\",\"dateAdded\": \"{}\",\"addedBy\":\"{}\"}}",
                 self.title,
                 self.date_added,
                 self.added_by)
@@ -187,7 +187,7 @@ struct ViewInfoData {
 
 impl ViewInfoData {
     fn to_json(&self) -> String {
-        format!("{{\"app_title\":\"{}\",\"grain_icon_url\":\"{}\"}}",
+        format!("{{\"appTitle\":\"{}\",\"grainIconUrl\":\"{}\"}}",
                 self.app_title, self.grain_icon_url)
     }
 }
