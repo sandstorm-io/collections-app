@@ -156,10 +156,10 @@ class GrainList extends React.Component {
   selectGrain(e) {
     const token = e.target.getAttribute("data-token");
     console.log("select grain", token);
-    if (e.target.checked) {
-      this.setState({ selectedGrains: this.state.selectedGrains.add(token) });
-    } else {
+    if (this.state.selectedGrains.get(token)) {
       this.setState({ selectedGrains: this.state.selectedGrains.remove(token) });
+    } else {
+      this.setState({ selectedGrains: this.state.selectedGrains.add(token) });
     }
   }
 
@@ -218,14 +218,15 @@ class GrainList extends React.Component {
       const info = this.props.viewInfos.get(e[0]) || {};
       if (matchFilter(grain, info)) {
         if (this.state.selectedGrains.get(e[0])) {
-          console.log("SAS");
           numShownAndSelected += 1;
         }
+
         grainRows.push(
           <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}>
-              <input data-token={e[0]} type="checkbox" onChange={this.selectGrain.bind(this)}/>
+            <input data-token={e[0]} type="checkbox" checked={!!this.state.selectedGrains.get(e[0])}
+                   onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
           <td>
