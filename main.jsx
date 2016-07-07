@@ -306,6 +306,9 @@ class Main extends React.Component {
     this.state = { grains: Immutable.Map(),
                    viewInfos: Immutable.Map(),
                  };
+  }
+
+  componentDidMount() {
     this.openWebSocket(0);
   }
 
