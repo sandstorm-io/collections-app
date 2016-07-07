@@ -139,7 +139,9 @@ class GrainList extends React.Component {
 
   constructor(props) {
     super(props);
-    this.state = { selectedGrains: Immutable.Set() };
+    this.state = { selectedGrains: Immutable.Set(),
+                   searchString: "",
+                 };
   }
 
   clickRemoveGrain(e) {
@@ -186,12 +188,40 @@ class GrainList extends React.Component {
     this.setState({ searchString: e.target.value});
   }
 
+  matchesAppOrGrainTitle = function (needle, grain, info) {
+    if (grain && grain.title && grain.title.toLowerCase().indexOf(needle) !== -1) return true;
+    if (info && info.appTitle && info.appTitle.toLowerCase().indexOf(needle) !== -1) return true;
+    return false;
+  }
+
   render() {
+    const searchKeys = this.state.searchString.toLowerCase()
+          .split(" ")
+          .filter((k) => k !== "");
+
+    const matchFilter = (grain, info) => {
+      if (searchKeys.length == 0) {
+        return true;
+      } else {
+        return _.chain(searchKeys)
+          .map((sk) => this.matchesAppOrGrainTitle(sk, grain, info))
+          .reduce((a,b) => a && b)
+          .value();
+      }
+    };
+
+
+    let numShownAndSelected = 0;
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
+      const grain = e[1];
       const info = this.props.viewInfos.get(e[0]) || {};
-//      if (info.grainIconUrl)
-      grainRows.push(
+      if (matchFilter(grain, info)) {
+        if (this.state.selectedGrains.get(e[0])) {
+          console.log("SAS");
+          numShownAndSelected += 1;
+        }
+        grainRows.push(
           <tr className="grain" key={e[0]}>
           { this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}>
@@ -204,16 +234,20 @@ class GrainList extends React.Component {
           <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
           {e[1].title}
         </td>
-          <td> {makeDateString(new Date(parseInt(e[1].dateAdded)))}</td>
-          <td> {e[1].addedBy}</td>
+          <td> {makeDateString(new Date(parseInt(grain.dateAdded)))}</td>
+          <td> {grain.addedBy}</td>
           </tr>
-      );
+        );
+      }
     }
 
     const bulkActionButtons = [];
     if (this.props.canWrite) {
       bulkActionButtons.push(
           <button key="unlink"
+                  disabled={numShownAndSelected==0}
+                 title={numShownAndSelected==0 ?
+                        "select grains to unlink them" : "unlink selected grains"}
                   onClick={this.clickRemoveGrain.bind(this)}>Unlink from collection... </button>);
     }
 
