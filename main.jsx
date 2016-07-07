@@ -74,13 +74,10 @@ function doRequest(serializedPowerboxDescriptor) {
   sendRpc("powerboxRequest", {
     query: [serializedPowerboxDescriptor]
   }).then((response) => {
-    console.log("response: " + JSON.stringify(response));
-
     if (response.canceled) {
-      console.log("canceled");
+      console.log("powerbox request was canceled");
     } else {
       return http("/token/" + response.token, "post", response.descriptor).then((response) => {
-        console.log("OK");
       });
     }
   });
@@ -336,9 +333,9 @@ class Description extends React.Component {
   render () {
     if (this.state.editing) {
       return <form onSubmit={this.submitEdit.bind(this)}>
-        <input type="text" onChange={this.changeDesc.bind(this)}
+        <textarea onChange={this.changeDesc.bind(this)}
                defaultValue={this.props.description}>
-        </input>
+        </textarea>
         <button className="description-button">done</button>
         </form>;
     } else if (this.props.description && this.props.description.length > 0) {
@@ -349,12 +346,12 @@ class Description extends React.Component {
       }
       return <p>{this.props.description} {button}</p>;
     } else {
-      let button = [];
       if (this.props.canWrite) {
-        button = <button className="description-button"
-                         onClick={this.clickEdit.bind(this)}>edit</button>;
+        return <button className="description-button"
+                       onClick={this.clickEdit.bind(this)}>add description</button>
+      } else {
+        return null;
       }
-      return <p>(This collection has no description) {button}</p>;
     }
   }
 }
@@ -445,6 +442,7 @@ class Main extends React.Component {
     return <div>
       {maybeSocketWarning}
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
+      <hr/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
                  canWrite={this.state.canWrite}/>
       </div>;
