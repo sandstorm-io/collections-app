@@ -256,7 +256,7 @@ class GrainList extends React.Component {
           <img title={info.appTitle} src={info.grainIconUrl} className="grain-icon"></img>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
-          {e[1].title}
+          <a href="/">{e[1].title}</a>
         </td>
           <td> {makeDateString(new Date(parseInt(grain.dateAdded)))}</td>
           <td> {grain.addedBy}</td>

@@ -186,6 +186,12 @@ button.description-button {
  padding: 0px 32px;
 }
 
+a {
+  font-weight: bold;
+  text-decoration: none;
+  color: $darker-purple-color;
+}
+
 .grain-list {
   overflow: auto;
   background-color: $grainlist-background-color;
