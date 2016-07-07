@@ -590,9 +590,7 @@ impl web_session::Server for WebSession {
         };
 
         if path.starts_with("token/") {
-            self.receive_request_token(
-                path[6..].to_string(),
-                params, results)
+            self.receive_request_token(path[6..].to_string(), params, results)
         } else if path.starts_with("offer/") {
             self.offer_ui_view(path[6..].to_string(), params, results)
         } else {
@@ -670,6 +668,12 @@ impl web_session::Server for WebSession {
     }
 }
 
+fn fill_in_client_error(mut results: web_session::PostResults, e: Error)
+{
+    let mut client_error = results.get().init_client_error();
+    client_error.set_description_html(&format!("{}", e)[..]);
+}
+
 impl WebSession {
     fn offer_ui_view(&mut self,
                      text_token: String,
@@ -703,11 +707,25 @@ impl WebSession {
                 Promise::ok(())
             }
             Err(e) => {
-                let mut client_error = results.get().init_client_error();
-                client_error.set_description_html(&format!("{}", e)[..]);
+                fill_in_client_error(results, e);
                 Promise::ok(())
             }
         })
+    }
+
+    fn read_powerbox_tag(&mut self, decoded_content: Vec<u8>) -> ::capnp::Result<String>
+    {
+        let mut cursor = ::std::io::Cursor::new(decoded_content);
+        let message = try!(::capnp::serialize_packed::read_message(&mut cursor,
+                                                                   Default::default()));
+        let desc: powerbox_descriptor::Reader = try!(message.get_root());
+        let tags = try!(desc.get_tags());
+        if tags.len() == 0 {
+            Err(Error::failed("no powerbox tag".into()))
+        } else {
+            let value: ui_view::powerbox_tag::Reader = try!(tags.get(0).get_value().get_as());
+            Ok(try!(value.get_title()).into())
+        }
     }
 
     fn receive_request_token(&mut self,
@@ -723,24 +741,17 @@ impl WebSession {
         let decoded_content = match base64::FromBase64::from_base64(content) {
             Ok(c) => c,
             Err(_) => {
-                // XXX should return a 400 error
-                return Promise::err(Error::failed("failed to convert from base64".into()));
+                fill_in_client_error(results, Error::failed("failed to convert from base64".into()));
+                return Promise::ok(())
             }
         };
-        let mut grain_title: String = String::new();
-        {
-            let mut cursor = ::std::io::Cursor::new(decoded_content);
-            let message = pry!(::capnp::serialize_packed::read_message(&mut cursor,
-                                                                       Default::default()));
-            let desc: powerbox_descriptor::Reader = pry!(message.get_root());
-            for tag in pry!(desc.get_tags()).iter() {
-                println!("tag {}", tag.get_id());
-                let value: ui_view::powerbox_tag::Reader = pry!(tag.get_value().get_as());
-                grain_title = pry!(value.get_title()).into();
-                println!("grain title: {}", grain_title);
-
+        let grain_title: String = match self.read_powerbox_tag(decoded_content) {
+            Ok(t) => t,
+            Err(e) => {
+                fill_in_client_error(results, e);
+                return Promise::ok(());
             }
-        }
+        };
 
         // now let's save this thing into an actual uiview sturdyref
         let mut req = self.context.claim_request_request();

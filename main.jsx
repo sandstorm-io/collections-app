@@ -75,9 +75,14 @@ function doRequest(serializedPowerboxDescriptor) {
     query: [serializedPowerboxDescriptor]
   }).then((response) => {
     console.log("response: " + JSON.stringify(response));
-    return http("/token/" + response.token, "post", response.descriptor).then((response) => {
-      console.log("OK");
-    });
+
+    if (response.canceled) {
+      console.log("canceled");
+    } else {
+      return http("/token/" + response.token, "post", response.descriptor).then((response) => {
+        console.log("OK");
+      });
+    }
   });
 }
 
