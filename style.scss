@@ -182,9 +182,12 @@ button.description-button {
   @extend %button-secondary;
 }
 
+#main {
+ padding: 0px 32px;
+}
+
 .grain-list {
   overflow: auto;
-  padding: 0px 32px;
   background-color: $grainlist-background-color;
   color: $grainlist-foreground-color;
 

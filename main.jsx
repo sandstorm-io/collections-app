@@ -341,13 +341,20 @@ class Description extends React.Component {
         </input>
         <button className="description-button">done</button>
         </form>;
-    } else {
+    } else if (this.props.description && this.props.description.length > 0) {
       let button = [];
       if (this.props.canWrite) {
         button = <button className="description-button"
                          onClick={this.clickEdit.bind(this)}>edit</button>;
       }
       return <p>{this.props.description} {button}</p>;
+    } else {
+      let button = [];
+      if (this.props.canWrite) {
+        button = <button className="description-button"
+                         onClick={this.clickEdit.bind(this)}>edit</button>;
+      }
+      return <p>(This collection has no description) {button}</p>;
     }
   }
 }

@@ -258,7 +258,7 @@ impl SavedUiViewSet {
             Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => {
                 use std::io::Write;
                 let mut f = try!(::std::fs::File::create("/var/description"));
-                let result = "this is a description";
+                let result = "";
                 try!(f.write_all(result.as_bytes()));
                 result.into()
             }
