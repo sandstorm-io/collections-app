@@ -252,7 +252,7 @@ class GrainList extends React.Component {
                    onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
-          <td>
+          <td className="td-app-icon">
           <img title={info.appTitle} src={info.grainIconUrl} className="grain-icon"></img>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
