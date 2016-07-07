@@ -142,14 +142,21 @@ class GrainList extends React.Component {
     this.state = { selectedGrains: Immutable.Set(),
                    searchString: "",
                  };
+
+    this._currentlyRendered = {};
   }
 
   clickRemoveGrain(e) {
+    let newSelected = this.state.selectedGrains;
+
     for (let e of this.state.selectedGrains.keys()) {
-      http("/sturdyref/" + e, "delete");
+      if (e in this._currentlyRendered) {
+        http("/sturdyref/" + e, "delete");
+        newSelected = newSelected.remove(e);
+      }
     }
 
-    this.setState({ selectedGrains: Immutable.Set() });
+    this.setState({ selectedGrains: newSelected });
 
   }
 
@@ -212,6 +219,7 @@ class GrainList extends React.Component {
 
 
     let numShownAndSelected = 0;
+    this._currentlyRendered = {};
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
       const grain = e[1];
@@ -220,9 +228,10 @@ class GrainList extends React.Component {
         if (this.state.selectedGrains.get(e[0])) {
           numShownAndSelected += 1;
         }
+        this._currentlyRendered[e[0]] = true;
 
         grainRows.push(
-          <tr className="grain" key={e[0]}>
+            <tr className="grain" key={e[0]} data-token={e[0]}>
           { this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}>
             <input data-token={e[0]} type="checkbox" checked={!!this.state.selectedGrains.get(e[0])}
