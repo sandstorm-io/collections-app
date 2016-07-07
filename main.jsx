@@ -272,7 +272,7 @@ class GrainList extends React.Component {
                   disabled={numShownAndSelected==0}
                  title={numShownAndSelected==0 ?
                         "select grains to unlink them" : "unlink selected grains"}
-                  onClick={this.clickRemoveGrain.bind(this)}>Unlink from collection... </button>);
+                  onClick={this.clickRemoveGrain.bind(this)}>Unlink from collection</button>);
     }
 
     return <div className="grain-list">
