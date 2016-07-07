@@ -379,7 +379,7 @@ class Main extends React.Component {
     this.openWebSocket(0);
   }
 
-  openWebSocket(delay) {
+  openWebSocket(delayOnFailure) {
     this.setState({socketReadyState: "connecting" });
 
     let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
@@ -395,14 +395,23 @@ class Main extends React.Component {
 
     ws.onclose = (e) => {
       console.log("websocket closed: ", e);
+      let newDelay = 0;
+      if (this.state.socketReadyState !== "open") {
+        if (delayOnFailure == 0) {
+          newDelay = 1000;
+        } else {
+          newDelay = delayOnFailure * 2;
+        }
+        console.log("websocket failed to connect. Retrying in " + delayOnFailure + "milliseconds");
+      }
       this.setState({ socketReadyState: "closed" });
 
-      // TODO delay
-      this.openWebSocket(0);
+      window.setTimeout(() => {
+        this.openWebSocket(newDelay);
+      }, delayOnFailure);
     };
 
     ws.onmessage = (m) => {
-      console.log("websocket got message: ", m.data);
       const action = JSON.parse(m.data);
       if (action.canWrite) {
         this.setState({canWrite: action.canWrite});
@@ -425,9 +434,16 @@ class Main extends React.Component {
   }
 
   render() {
+    let maybeSocketWarning = null;
+    if (this.state.socketReadyState === "connecting") {
+      maybeSocketWarning = <p>WebSocket connecting...</p>;
+    } else if (this.state.socketReadyState === "closed") {
+      // TODO display timer for how long until next retry
+      maybeSocketWarning = <p>WebSocket closed! Waiting and then retrying...</p>;
+    }
 
     return <div>
-      <p>socket state: {this.state.socketReadyState}</p>
+      {maybeSocketWarning}
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
                  canWrite={this.state.canWrite}/>
