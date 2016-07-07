@@ -53,7 +53,6 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
                 timer: ::gjio::Timer,
                 awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
 {
-    println!("pinging");
     let mut req = client_stream.send_bytes_request();
     req.get().set_message(&[0x89, 0]); // PING
     let promise = req.send().promise;
@@ -102,8 +101,8 @@ impl web_socket_stream::Server for WebSocketStream {
     {
         let message = pry!(pry!(params.get()).get_message());
         let opcode = message[0] & 0xf; // or is it 0xf0?
-        let masked = (message[1] & 0x80) != 0;
-        let length = message[1] & 0x7f;
+        let _masked = (message[1] & 0x80) != 0;
+        let _length = message[1] & 0x7f;
 
         match opcode {
             0x0 => { // CONTINUE
@@ -126,8 +125,6 @@ impl web_socket_stream::Server for WebSocketStream {
                 println!("unrecognized websocket opcode {}", opcode);
             }
         }
-        println!("opcode {}, masked {}, length {}", opcode, masked, length);
-        println!("websocket message {:?}", message);
         Promise::ok(())
     }
 }
@@ -652,9 +649,7 @@ impl web_session::Server for WebSession {
                      mut results: web_session::OpenWebSocketResults)
                      -> Promise<(), Error>
     {
-        println!("open web socket!");
         let client_stream = pry!(pry!(params.get()).get_client_stream());
-
 
         results.get().set_server_stream(
             web_socket_stream::ToClient::new(
@@ -927,7 +922,7 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         let mut event_port = try!(::gjio::EventPort::new());
         let network = event_port.get_network();
 
-        // sandstorm launches us with a connection on file descriptor 3
+        // Sandstorm launches us with a connection on file descriptor 3.
 	    let stream = try!(unsafe { network.wrap_raw_socket_descriptor(3) });
 
         let (p, f) = Promise::and_fulfiller();
