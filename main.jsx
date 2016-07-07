@@ -157,7 +157,6 @@ class GrainList extends React.Component {
     }
 
     this.setState({ selectedGrains: newSelected });
-
   }
 
   selectGrain(e) {
@@ -183,7 +182,23 @@ class GrainList extends React.Component {
   }
 
   selectAll(e) {
-    console.log("select all!");
+    if (!e.target.checked) {
+      let newSelected = this.state.selectedGrains;
+      for (let e of this.state.selectedGrains.keys()) {
+        if (e in this._currentlyRendered) {
+          newSelected = newSelected.remove(e);
+        }
+      }
+
+      this.setState({ selectedGrains: newSelected });
+    } else {
+      let newSelected = this.state.selectedGrains;
+      for (const e in this._currentlyRendered) {
+        newSelected = newSelected.add(e);
+      }
+
+      this.setState({ selectedGrains: newSelected });
+    }
   }
 
   offerUiView(token) {
@@ -279,7 +294,8 @@ class GrainList extends React.Component {
          {this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}
               className="select-all-grains">
-          <input type="checkbox" onChange={this.selectAll.bind(this)}/>
+          <input type="checkbox" onChange={this.selectAll.bind(this)}
+                 checked={numShownAndSelected > 0}/>
            </td> : [] }
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
