@@ -128,7 +128,9 @@ class GrainList extends React.Component {
            viewInfos: Immutable.Map,
            canWrite: bool,
          };
-  state: { selectedGrains: Immutable.Set };
+  state: { selectedGrains: Immutable.Set,
+           searchString: String,
+         };
 
   constructor(props) {
     super(props);
@@ -175,6 +177,10 @@ class GrainList extends React.Component {
     http("/offer/" + token, "post");
   }
 
+  searchStringChange(e) {
+    this.setState({ searchString: e.target.value});
+  }
+
   render() {
     const grainRows = [];
     for (let e of this.props.grains.entries()) {
@@ -207,6 +213,12 @@ class GrainList extends React.Component {
     }
 
     return <div className="grain-list">
+      <div className="search-row">
+      <label>
+      <input className="search-bar" type="text" placeholder="search"
+             onChange={this.searchStringChange.bind(this)}/>
+      </label>
+      </div>
       <div className="bulk-action-buttons">
       {bulkActionButtons}
     </div>
@@ -342,7 +354,6 @@ class Main extends React.Component {
     return <div>
       <p>socket state: {this.state.socketReadyState}</p>
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
-      <input className="search-bar" type="text" placeholder="search"/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
                  canWrite={this.state.canWrite}/>
       </div>;
