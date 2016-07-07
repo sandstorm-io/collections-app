@@ -231,7 +231,7 @@ class GrainList extends React.Component {
 
     let numShownAndSelected = 0;
     this._currentlyRendered = {};
-    const grainRows = [];
+    const grains = [];
     for (let e of this.props.grains.entries()) {
       const grain = e[1];
       const info = this.props.viewInfos.get(e[0]) || {};
@@ -241,26 +241,27 @@ class GrainList extends React.Component {
         }
         this._currentlyRendered[e[0]] = true;
 
-        grainRows.push(
-            <tr className="grain" key={e[0]} data-token={e[0]}>
-          { this.props.canWrite ?
-            <td onClick={this.clickCheckboxContainer.bind(this)}>
-            <input data-token={e[0]} type="checkbox" checked={!!this.state.selectedGrains.get(e[0])}
-                   onChange={this.selectGrain.bind(this)}/>
+        grains.push({token: e[0], grain, info });
+      }
+    }
+    const grainRows = _.chain(grains).sortBy((r) => r.grain.dateAdded).map((r) => {
+      return (<tr className="grain" key={r.token} data-token={r.token}>
+        { this.props.canWrite ?
+          <td onClick={this.clickCheckboxContainer.bind(this)}>
+          <input data-token={r.token} type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
+          onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
           <td className="td-app-icon">
-          <img title={info.appTitle} src={info.grainIconUrl} className="grain-icon"></img>
+          <img title={r.info.appTitle} src={r.info.grainIconUrl} className="grain-icon"></img>
           </td>
-          <td className="click-to-go" onClick={this.offerUiView.bind(this, e[0])}>
-          <a href="/">{e[1].title}</a>
+          <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+          <a href="/">{r.grain.title}</a>
         </td>
-          <td> {makeDateString(new Date(parseInt(grain.dateAdded)))}</td>
-          <td> {grain.addedBy}</td>
-          </tr>
-        );
-      }
-    }
+          <td> {makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>
+          <td> {r.grain.addedBy}</td>
+              </tr>);
+    }).value();
 
     const bulkActionButtons = [];
     if (this.props.canWrite) {
