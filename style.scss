@@ -145,11 +145,16 @@ body {
   height: 100%;
   font-family: "Source Sans Pro", sans-serif;
   font-weight: normal;
-  background-color: white;
+  background-color: $grainlist-background-color;
   &.modal-shown {
     // When a modal is being shown, make it so only the modal scrolls.
     overflow-y: hidden;
   }
+}
+
+button.description-button {
+  @extend %button-base;
+  @extend %button-secondary;
 }
 
 .grain-list {

@@ -161,7 +161,6 @@ class GrainList extends React.Component {
 
   selectGrain(e) {
     const token = e.target.getAttribute("data-token");
-    console.log("select grain", token);
     if (this.state.selectedGrains.get(token)) {
       this.setState({ selectedGrains: this.state.selectedGrains.remove(token) });
     } else {
@@ -340,12 +339,13 @@ class Description extends React.Component {
         <input type="text" onChange={this.changeDesc.bind(this)}
                defaultValue={this.props.description}>
         </input>
-        <button>done</button>
+        <button className="description-button">done</button>
         </form>;
     } else {
       let button = [];
       if (this.props.canWrite) {
-        button = <button key="hi" onClick={this.clickEdit.bind(this)}>edit</button>;
+        button = <button className="description-button"
+                         onClick={this.clickEdit.bind(this)}>edit</button>;
       }
       return <p>{this.props.description} {button}</p>;
     }
