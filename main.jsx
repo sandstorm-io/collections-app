@@ -259,7 +259,7 @@ class GrainList extends React.Component {
           <a href="/">{r.grain.title}</a>
         </td>
           <td> {makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>
-          <td> {r.grain.addedBy}</td>
+              {/*<td> {r.grain.addedBy}</td>*/}
               </tr>);
     }).value();
 
@@ -297,7 +297,7 @@ class GrainList extends React.Component {
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
               <td className="date-added">Date added</td>
-              <td className="added-by">Added by</td>
+      {/*<td className="added-by">Added by</td>*/}
             </tr>
           </thead>
         <tbody>
