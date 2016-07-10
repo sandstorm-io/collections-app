@@ -31,7 +31,8 @@ use std::rc::Rc;
 use collections_capnp::ui_view_metadata;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
-use sandstorm::grain_capnp::{session_context, user_info, ui_view, ui_session, sandstorm_api};
+use sandstorm::identity_capnp::{user_info};
+use sandstorm::grain_capnp::{session_context, ui_view, ui_session, sandstorm_api};
 use sandstorm::grain_capnp::{static_asset};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
