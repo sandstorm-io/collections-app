@@ -772,7 +772,7 @@ impl WebSession {
             req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
             {
                 let mut save_label = req.get().init_label();
-                save_label.set_default_text("[save label chosen by collections app]");
+                save_label.set_default_text(&format!("grain with title: {}", grain_title)[..]);
             }
             req.send().promise.map(move |response| {
                 let binary_token = try!(try!(response.get()).get_token());

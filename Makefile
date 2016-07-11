@@ -30,5 +30,5 @@ target/release/server: src/ schema/ build.rs
 
 spk/server: target/release/server
 	@mkdir -p spk
-	cp target/release/server spk/server
+	cp target/release/server spk/collections-server
 
