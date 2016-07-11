@@ -37,6 +37,9 @@ use sandstorm::grain_capnp::{static_asset};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
+const ADD_GRAIN_ACTIVITY_INDEX: u16 = 0;
+const REMOVE_GRAIN_ACTIVITY_INDEX: u16 = 1;
+
 pub struct WebSocketStream {
     id: u64,
     awaiting_pong: Rc<Cell<bool>>,
@@ -640,8 +643,12 @@ impl web_session::Server for WebSession {
             Promise::ok(())
         } else {
             pry!(self.saved_ui_views.borrow_mut().remove(&path[10..]));
-            results.get().init_no_content();
-            Promise::ok(())
+            let mut req = self.context.activity_request();
+            req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
+            req.send().promise.then(move |_| {
+                results.get().init_no_content();
+                Promise::ok(())
+            })
         }
     }
 
@@ -778,10 +785,15 @@ impl WebSession {
             })
         });
 
+        let context = self.context.clone();
         do_stuff.then_else(move |r| match r {
             Ok(()) => {
-                let mut _content = results.get().init_content();
-                Promise::ok(())
+                let mut req = context.activity_request();
+                req.get().init_event().set_type(ADD_GRAIN_ACTIVITY_INDEX);
+                req.send().promise.then(move |_| {
+                    let mut _content = results.get().init_content();
+                    Promise::ok(())
+                })
             }
             Err(e) => {
                 let mut error = results.get().init_client_error();
@@ -892,13 +904,13 @@ impl ui_view::Server for UiView {
         {
             let mut event_types = view_info.init_event_types(2);
             {
-                let mut added = event_types.borrow().get(0);
-                added.set_name("added");
+                let mut added = event_types.borrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
+                added.set_name("add");
                 added.borrow().init_verb_phrase().set_default_text("grain added");
             }
             {
-                let mut removed = event_types.borrow().get(0);
-                removed.set_name("removed");
+                let mut removed = event_types.borrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
+                removed.set_name("remove");
                 removed.borrow().init_verb_phrase().set_default_text("grain removed");
             }
         }
