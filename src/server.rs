@@ -873,19 +873,36 @@ impl ui_view::Server for UiView {
             write.init_title().set_default_text("write");
         }
 
-        let mut roles = view_info.init_roles(2);
         {
-            let mut editor = roles.borrow().get(0);
-            editor.borrow().init_title().set_default_text("editor");
-            editor.borrow().init_verb_phrase().set_default_text("can edit");
-            editor.init_permissions(1).set(0, true);   // has "write" permission
+            let mut roles = view_info.borrow().init_roles(2);
+            {
+                let mut editor = roles.borrow().get(0);
+                editor.borrow().init_title().set_default_text("editor");
+                editor.borrow().init_verb_phrase().set_default_text("can edit");
+                editor.init_permissions(1).set(0, true);   // has "write" permission
+            }
+            {
+                let mut viewer = roles.get(1);
+                viewer.borrow().init_title().set_default_text("viewer");
+                viewer.borrow().init_verb_phrase().set_default_text("can view");
+                viewer.init_permissions(1).set(0, false);  // does not have "write" permission
+            }
         }
+
         {
-            let mut viewer = roles.get(1);
-            viewer.borrow().init_title().set_default_text("viewer");
-            viewer.borrow().init_verb_phrase().set_default_text("can view");
-            viewer.init_permissions(1).set(0, false);  // does not have "write" permission
+            let mut event_types = view_info.init_event_types(2);
+            {
+                let mut added = event_types.borrow().get(0);
+                added.set_name("added");
+                added.borrow().init_verb_phrase().set_default_text("grain added");
+            }
+            {
+                let mut removed = event_types.borrow().get(0);
+                removed.set_name("removed");
+                removed.borrow().init_verb_phrase().set_default_text("grain removed");
+            }
         }
+
         Promise::ok(())
     }
 
