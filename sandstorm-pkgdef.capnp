@@ -11,7 +11,7 @@ const pkgdef :Spk.PackageDefinition = (
     appMarketingVersion = (defaultText = "0.0.0"),
 
     actions = [
-      ( title = (defaultText = "new collection"),
+      (
         nounPhrase = (defaultText = "collection"),
         command = .myCommand
         # The command to run when starting for the first time. (".myCommand"
@@ -35,20 +35,16 @@ const pkgdef :Spk.PackageDefinition = (
       ),
 
       website = "https://sandstorm.io",
-      codeUrl = "http://example.com",
+      codeUrl = "https://github.com/dwrensha/sandstorm-collections-app",
+      license = (openSource = mit),
 
-      license = (none = void),
-      # The license this package is distributed under.  See
-      # https://docs.sandstorm.io/en/latest/developing/publishing-apps/#license
-
-      categories = [],
+      categories = [productivity],
       # A list of categories/genres to which this app belongs, sorted with best fit first.
       # See the list of categories at
       # https://docs.sandstorm.io/en/latest/developing/publishing-apps/#categories
 
       author = (
-        # Fields relating to the author of this app.
-
+        upstreamAuthor = "David Renshaw",
         contactEmail = "david@sandstorm.io",
         # Email address to contact for any issues with this app. This includes end-user support
         # requests as well as app store administrator requests, so it is very important that this be a
@@ -67,12 +63,6 @@ const pkgdef :Spk.PackageDefinition = (
         #
         # Further details including how to set up GPG and how to use keybase.io can be found
         # at https://docs.sandstorm.io/en/latest/developing/publishing-apps/#verify-your-identity
-
-        upstreamAuthor = "Example App Team",
-        # Name of the original primary author of this app, if it is different from the person who
-        # produced the Sandstorm package. Setting this implies that the author connected to the PGP
-        # signature only "packaged" the app for Sandstorm, rather than developing the app.
-        # Remove this line if you consider yourself as the author of the app.
       ),
 
       #pgpKeyring = embed "path/to/pgp-keyring",
