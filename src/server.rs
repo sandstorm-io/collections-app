@@ -642,12 +642,29 @@ impl web_session::Server for WebSession {
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
             Promise::ok(())
         } else {
-            pry!(self.saved_ui_views.borrow_mut().remove(&path[10..]));
-            let mut req = self.context.activity_request();
-            req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
-            req.send().promise.then(move |_| {
-                results.get().init_no_content();
-                Promise::ok(())
+            let token_str = &path[10..];
+            let binary_token = match base64::FromBase64::from_base64(token_str) {
+                Ok(b) => b,
+                Err(e) => {
+                    results.get().init_client_error().set_description_html(&format!("{}", e)[..]);
+                    return Promise::ok(())
+                }
+            };
+
+            pry!(self.saved_ui_views.borrow_mut().remove(token_str));
+            let context = self.context.clone();
+            let mut req = self.sandstorm_api.drop_request();
+            req.get().set_token(&binary_token);
+            req.send().promise.then_else(move |_| {
+                // then_else() because drop() is currently broken. :(
+
+                let mut req = context.activity_request();
+                req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
+                req.send().promise.then(move |_| {
+                    println!("remove grain!");
+                    results.get().init_no_content();
+                    Promise::ok(())
+                })
             })
         }
     }
