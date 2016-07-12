@@ -22,7 +22,7 @@
 use gj::{Promise, EventLoop};
 use capnp::Error;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{base64, hex};
+use rustc_serialize::{base64, hex, json};
 
 use std::collections::hash_map::HashMap;
 use std::cell::{Cell, RefCell};
@@ -173,8 +173,8 @@ struct SavedUiViewData {
 
 impl SavedUiViewData {
     fn to_json(&self) -> String {
-        format!("{{\"title\":\"{}\",\"dateAdded\": \"{}\",\"addedBy\":\"{}\"}}",
-                self.title,
+        format!("{{\"title\":{},\"dateAdded\": \"{}\",\"addedBy\":\"{}\"}}",
+                json::ToJson::to_json(&self.title),
                 self.date_added,
                 self.added_by)
     }
@@ -188,8 +188,9 @@ struct ViewInfoData {
 
 impl ViewInfoData {
     fn to_json(&self) -> String {
-        format!("{{\"appTitle\":\"{}\",\"grainIconUrl\":\"{}\"}}",
-                self.app_title, self.grain_icon_url)
+        format!("{{\"appTitle\":{},\"grainIconUrl\":\"{}\"}}",
+                json::ToJson::to_json(&self.app_title),
+                self.grain_icon_url)
     }
 }
 
@@ -220,7 +221,7 @@ impl Action {
                 format!("{{\"canWrite\":{}}}", b)
             }
             &Action::Description(ref s) => {
-                format!("{{\"description\":\"{}\"}}", s)
+                format!("{{\"description\":{}}}", json::ToJson::to_json(s))
             }
         }
     }
