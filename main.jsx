@@ -125,6 +125,11 @@ function makeDateString(date) {
   return result;
 };
 
+const SEARCH_ICON = <svg className="search-icon" version="1.1" viewBox="-7 166 20 20">
+      <path d="M10.9,182.9l-5.1-5.6c0.9-1.1,1.4-2.4,1.4-4c0-3.4-2.8-6.2-6.2-6.2s-6.2,2.8-6.2,6.2c0,3.4,2.8,6.2,6.2,6.2 c1.2,0,2.4-0.4,3.4-1l5.1,5.6c0.4,0.4,0.9,0.4,1.3,0.1C11.2,183.9,11.2,183.3,10.9,182.9z M-2.1,176.5c-0.8-0.8-1.3-1.9-1.3-3.1 c0-1.2,0.5-2.3,1.3-3.2c0.8-0.8,1.9-1.3,3.2-1.3c1.2,0,2.3,0.5,3.2,1.3c0.7,0.8,1.2,1.9,1.2,3.2c0,1.2-0.5,2.3-1.3,3.2 c-0.8,0.8-1.9,1.3-3.2,1.3C-0.2,177.8-1.3,177.3-2.1,176.5z"/>
+    </svg>;
+
+
 class GrainList extends React.Component {
   props: { grains: Immutable.Map,
            viewInfos: Immutable.Map,
@@ -276,6 +281,7 @@ class GrainList extends React.Component {
     return <div className="grain-list">
       <div className="search-row">
       <label>
+      {SEARCH_ICON}
       <input className="search-bar" type="text" placeholder="search"
              onChange={this.searchStringChange.bind(this)}/>
       </label>

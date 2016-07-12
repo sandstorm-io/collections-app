@@ -214,22 +214,23 @@ a {
   }
 
   >.search-row {
+    height: 32px;
+
     display: block;
     vertical-align: top;
     >label {
-      >span.search-icon {
-        @extend %pseudo-img-tag;
-        background-image: url("/search.svg");
-        background-size: 24px 24px;
-        background-position: center;
-        display: inline-block;
-        width: 32px;
-        height: 32px;
-        vertical-align: top;
-      }
+      display: flex;
+      justify-content: space-between;
+      max-width: 320px;
+      height: 100%;
+       svg {
+        height: 100%;
+        fill: #9e9e9e;
+       }
       >input.search-bar {
         font-size: 16pt;
-        height: 32px;
+        height: 100%;
+        width: calc(100% - 36px);
         background-color: $grainlist-searchbar-background-color;
         border: 1px solid $grainlist-searchbar-outline-color;
         &:focus {
