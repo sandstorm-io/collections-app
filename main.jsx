@@ -93,11 +93,16 @@ class AddGrain extends React.Component {
   }
 
   handleClick(event) {
+    event.preventDefault();
     doRequest(interfaces.uiView);
   }
 
   render() {
-    return <button onClick={this.handleClick}> Add grain... </button>;
+    return <tr className="add-grains" onClick={this.handleClick}>
+      <td/> <td className="install-icon">{INSTALL_ICON}</td>
+      <td><button>Add grains...</button></td>
+      <td/>
+      </tr>;
   }
 }
 
@@ -125,10 +130,15 @@ function makeDateString(date) {
   return result;
 };
 
+// Icons borrowed from the main Sandstorm repo.
+
 const SEARCH_ICON = <svg className="search-icon" version="1.1" viewBox="-7 166 20 20">
       <path d="M10.9,182.9l-5.1-5.6c0.9-1.1,1.4-2.4,1.4-4c0-3.4-2.8-6.2-6.2-6.2s-6.2,2.8-6.2,6.2c0,3.4,2.8,6.2,6.2,6.2 c1.2,0,2.4-0.4,3.4-1l5.1,5.6c0.4,0.4,0.9,0.4,1.3,0.1C11.2,183.9,11.2,183.3,10.9,182.9z M-2.1,176.5c-0.8-0.8-1.3-1.9-1.3-3.1 c0-1.2,0.5-2.3,1.3-3.2c0.8-0.8,1.9-1.3,3.2-1.3c1.2,0,2.3,0.5,3.2,1.3c0.7,0.8,1.2,1.9,1.2,3.2c0,1.2-0.5,2.3-1.3,3.2 c-0.8,0.8-1.9,1.3-3.2,1.3C-0.2,177.8-1.3,177.3-2.1,176.5z"/>
-    </svg>;
+      </svg>;
 
+const INSTALL_ICON = <svg version="1.1" viewBox="32 32 64 64" >
+	  <path class="st0" d="M58.8,71.2H37.5V58.6h21.3V36.4h13v22.2h21.3v12.6H71.8v22.2h-13V71.2z"/>
+      </svg>;
 
 class GrainList extends React.Component {
   props: { grains: Immutable.Map,
@@ -289,8 +299,6 @@ class GrainList extends React.Component {
       <div className="bulk-action-buttons">
       {bulkActionButtons}
     </div>
-      <div className="buttons"> {this.props.canWrite ? <AddGrain/>: [] } </div>
-
       <table className="grain-list-table">
           <thead>
            <tr>
@@ -306,7 +314,8 @@ class GrainList extends React.Component {
       {/*<td className="added-by">Added by</td>*/}
             </tr>
           </thead>
-        <tbody>
+      <tbody>
+      {(this.props.canWrite && !this.state.searchString) ? <AddGrain/>: [] }
       { grainRows }
     </tbody>
     </table>

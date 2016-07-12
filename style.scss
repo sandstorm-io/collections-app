@@ -239,22 +239,6 @@ a {
       }
     }
   }
-  >.buttons {
-    float: right;
-    clear: right;
-    >button {
-      @extend %button-base;
-      @extend %button-primary;
-      display: inline-block;
-      float: right;
-      font-size: 14pt;
-      line-height: 16pt;
-      height: 32px;
-      margin-top: 10px;
-      margin-bottom: 10px;
-      margin-left: 10px;
-    }
-  }
   >.top-row>.usage-info {
     float: right;
     vertical-align: top;
@@ -371,6 +355,30 @@ a {
         }
       }
     }
+    &.add-grains {
+      cursor: pointer;
+      background-color: $grainlist-table-row-action-background-color;
+      &:hover {
+        background-color: $grainlist-table-row-action-background-color-hover;
+        >td.install-icon>svg {
+          fill: #6A237C;
+        }
+      }
+      >td.install-icon {
+        padding-left: 16px;
+        >svg {
+          width: 24px;
+          height: 24px;
+          fill: #9E40B5;
+        }
+      }
+      >td>button {
+        @extend %unstyled-button;
+        font-weight: 600;
+        color: black;
+      }
+    }
+
     &.grain {
       .click-to-go {
         cursor: pointer;
