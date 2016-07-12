@@ -336,13 +336,16 @@ a {
     >td {
       position: relative;
       &.td-app-icon {
+        height: 31px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         >.app-icon {
           @extend %pseudo-img-tag;
           width: 24px;
           height: 24px;
         }
         width: 64px;
-        padding-left: 16px;
       }
       &.date-added {
         width: 100px;
@@ -365,7 +368,10 @@ a {
         }
       }
       >td.install-icon {
-        padding-left: 16px;
+        height: 31px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         >svg {
           width: 24px;
           height: 24px;
