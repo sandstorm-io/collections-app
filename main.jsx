@@ -273,15 +273,17 @@ class GrainList extends React.Component {
           onChange={this.selectGrain.bind(this)}/>
             </td> :
             [] }
-          <td className="td-app-icon">
-          <img title={r.info.appTitle} src={r.info.grainIconUrl} className="grain-icon"></img>
+          <td className="td-app-icon click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+              <img title={r.info.appTitle} src={r.info.grainIconUrl} className="grain-icon"></img>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
               <a href="/" onClick={(e) => {e.preventDefault();} }>{r.grain.title}</a>
           </td>
-          <td> {makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>
+          <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+              {makeDateString(new Date(parseInt(r.grain.dateAdded)))}
+          </td>
               {/*<td> {r.grain.addedBy}</td>*/}
-              </tr>);
+          </tr>);
     }).value();
 
     const bulkActionButtons = [];
