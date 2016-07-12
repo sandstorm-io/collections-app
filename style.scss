@@ -177,11 +177,6 @@ body {
   box-sizing: inherit;
 }
 
-button.description-button {
-  @extend %button-base;
-  @extend %button-secondary;
-}
-
 #main {
  padding: 32px 32px;
 }
@@ -190,6 +185,37 @@ a {
   font-weight: bold;
   text-decoration: none;
   color: $darker-purple-color;
+}
+
+button.secondary-button {
+  @extend %button-base;
+  @extend %button-secondary;
+}
+
+.description-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  >p {
+    max-width: calc(100% - 36px);
+    font-weight: bold;
+    font-size: 12pt;
+  }
+  button.description-button {
+    @extend %button-base;
+    @extend %button-secondary;
+    padding-top: 0;
+    padding-bottom: 0;
+    padding-left: 0;
+    padding-right: 0;
+    width: 24px;
+    height: 24px;
+  }
+  >textarea {
+    width: calc(100% - 36px);
+    height: 60px;
+  }
 }
 
 .grain-list {

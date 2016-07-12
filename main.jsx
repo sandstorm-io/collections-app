@@ -83,6 +83,22 @@ function doRequest(serializedPowerboxDescriptor) {
   });
 }
 
+// Icons borrowed from the main Sandstorm repo.
+
+const SEARCH_ICON = <svg className="search-icon" version="1.1" viewBox="-7 166 20 20">
+      <path d="M10.9,182.9l-5.1-5.6c0.9-1.1,1.4-2.4,1.4-4c0-3.4-2.8-6.2-6.2-6.2s-6.2,2.8-6.2,6.2c0,3.4,2.8,6.2,6.2,6.2 c1.2,0,2.4-0.4,3.4-1l5.1,5.6c0.4,0.4,0.9,0.4,1.3,0.1C11.2,183.9,11.2,183.3,10.9,182.9z M-2.1,176.5c-0.8-0.8-1.3-1.9-1.3-3.1 c0-1.2,0.5-2.3,1.3-3.2c0.8-0.8,1.9-1.3,3.2-1.3c1.2,0,2.3,0.5,3.2,1.3c0.7,0.8,1.2,1.9,1.2,3.2c0,1.2-0.5,2.3-1.3,3.2 c-0.8,0.8-1.9,1.3-3.2,1.3C-0.2,177.8-1.3,177.3-2.1,176.5z"/>
+      </svg>;
+
+const INSTALL_ICON = <svg version="1.1" viewBox="32 32 64 64" >
+	  <path class="st0" d="M58.8,71.2H37.5V58.6h21.3V36.4h13v22.2h21.3v12.6H71.8v22.2h-13V71.2z"/>
+      </svg>;
+
+const EDIT_ICON = <svg version="1.1" viewBox="-4.5 168.5 15 15">
+	  <polygon points="1.1,179.6 -0.9,180.1 -0.5,178.1 	"/>
+	  <path d="M6.4,171.5c-0.2-0.2-0.6-0.1-0.8,0.1l-5.8,6.1l1.7,1.7l5.8-6.1c0.2-0.2,0.3-0.5,0.1-0.7L6.4,171.5z"/>
+	  <polyline points="-1.5,181.5 5.7,181.5 5.7,180.7 -1.5,180.7"/>
+      </svg>;
+
 
 class AddGrain extends React.Component {
   props: {};
@@ -129,16 +145,6 @@ function makeDateString(date) {
 
   return result;
 };
-
-// Icons borrowed from the main Sandstorm repo.
-
-const SEARCH_ICON = <svg className="search-icon" version="1.1" viewBox="-7 166 20 20">
-      <path d="M10.9,182.9l-5.1-5.6c0.9-1.1,1.4-2.4,1.4-4c0-3.4-2.8-6.2-6.2-6.2s-6.2,2.8-6.2,6.2c0,3.4,2.8,6.2,6.2,6.2 c1.2,0,2.4-0.4,3.4-1l5.1,5.6c0.4,0.4,0.9,0.4,1.3,0.1C11.2,183.9,11.2,183.3,10.9,182.9z M-2.1,176.5c-0.8-0.8-1.3-1.9-1.3-3.1 c0-1.2,0.5-2.3,1.3-3.2c0.8-0.8,1.9-1.3,3.2-1.3c1.2,0,2.3,0.5,3.2,1.3c0.7,0.8,1.2,1.9,1.2,3.2c0,1.2-0.5,2.3-1.3,3.2 c-0.8,0.8-1.9,1.3-3.2,1.3C-0.2,177.8-1.3,177.3-2.1,176.5z"/>
-      </svg>;
-
-const INSTALL_ICON = <svg version="1.1" viewBox="32 32 64 64" >
-	  <path class="st0" d="M58.8,71.2H37.5V58.6h21.3V36.4h13v22.2h21.3v12.6H71.8v22.2h-13V71.2z"/>
-      </svg>;
 
 class GrainList extends React.Component {
   props: { grains: Immutable.Map,
@@ -348,23 +354,26 @@ class Description extends React.Component {
 
   render () {
     if (this.state.editing) {
-      return <form onSubmit={this.submitEdit.bind(this)}>
+      return <form className="description-row" onSubmit={this.submitEdit.bind(this)}>
         <textarea onChange={this.changeDesc.bind(this)}
                defaultValue={this.props.description}>
         </textarea>
-        <button className="description-button">done</button>
+        <button className="secondary-button" title="done editing">done</button>
         </form>;
     } else if (this.props.description && this.props.description.length > 0) {
       let button = [];
       if (this.props.canWrite) {
         button = <button className="description-button"
-                         onClick={this.clickEdit.bind(this)}>edit</button>;
+                         title="edit description"
+                         onClick={this.clickEdit.bind(this)}>{EDIT_ICON}</button>;
       }
-      return <p>{this.props.description} {button}</p>;
+      return <div className="description-row"><p>{this.props.description}</p>
+      {button}
+      </div>;
     } else {
       if (this.props.canWrite) {
-        return <button className="description-button"
-                       onClick={this.clickEdit.bind(this)}>add description</button>
+        return <button className="secondary-button" title="add description"
+                       onClick={this.clickEdit.bind(this)}>Add description</button>
       } else {
         return null;
       }
