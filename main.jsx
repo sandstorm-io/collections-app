@@ -115,7 +115,10 @@ class AddGrain extends React.Component {
 
   render() {
     return <tr className="add-grains" onClick={this.handleClick}>
-      <td/> <td className="install-icon">{INSTALL_ICON}</td>
+      <td/>
+      <td className="install-icon">
+       {INSTALL_ICON}
+      </td>
       <td><button>Add grain...</button></td>
       <td/>
       </tr>;
