@@ -7,6 +7,11 @@ import _ from "underscore";
 function http(url: string, method, data): Promise<string> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    if (method === "delete") {
+      // Work around Firefox bug: https://bugzilla.mozilla.org/show_bug.cgi?id=521301
+      xhr.responseType = "text";
+    }
+
     xhr.onload = () => {
       if (xhr.status >= 400) {
         reject(new Error("XHR returned status " + xhr.status + ":\n" + xhr.responseText));
