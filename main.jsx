@@ -90,7 +90,7 @@ const SEARCH_ICON = <svg className="search-icon" version="1.1" viewBox="-7 166 2
       </svg>;
 
 const INSTALL_ICON = <svg version="1.1" viewBox="32 32 64 64" >
-	  <path class="st0" d="M58.8,71.2H37.5V58.6h21.3V36.4h13v22.2h21.3v12.6H71.8v22.2h-13V71.2z"/>
+	  <path d="M58.8,71.2H37.5V58.6h21.3V36.4h13v22.2h21.3v12.6H71.8v22.2h-13V71.2z"/>
       </svg>;
 
 const EDIT_ICON = <svg version="1.1" viewBox="-4.5 168.5 15 15">
