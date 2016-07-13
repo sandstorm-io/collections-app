@@ -26,8 +26,8 @@
     "node-sass": "^3.4.2",
     "postcss": "^5.0.19",
     "postcss-cli": "^2.5.1",
-    "react": "^0.14.7",
-    "react-dom": "^0.14.7",
+    "react": "^15.2.1",
+    "react-dom": "^15.2.1",
     "uglify-js": "^2.6.2",
     "underscore": "^1.8.3"
   }
