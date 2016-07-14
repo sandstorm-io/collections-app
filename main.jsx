@@ -119,7 +119,7 @@ class AddGrain extends React.Component {
   }
 
   render() {
-    return <tr className="add-grains" onClick={this.handleClick}>
+    return <tr className="add-grain" onClick={this.handleClick}>
       <td/>
       <td className="install-icon">
        {INSTALL_ICON}
@@ -185,8 +185,7 @@ class GrainList extends React.Component {
     this.setState({ selectedGrains: newSelected });
   }
 
-  selectGrain(e) {
-    const token = e.target.getAttribute("data-token");
+  selectGrain(token, e) {
     if (this.state.selectedGrains.get(token)) {
       this.setState({ selectedGrains: this.state.selectedGrains.remove(token) });
     } else {
@@ -274,11 +273,11 @@ class GrainList extends React.Component {
       }
     }
     const grainRows = _.chain(grains).sortBy((r) => r.grain.dateAdded).map((r) => {
-      return (<tr className="grain" key={r.token} data-token={r.token}>
+      return (<tr className="grain" key={r.token}>
         { this.props.canWrite ?
           <td onClick={this.clickCheckboxContainer.bind(this)}>
-          <input data-token={r.token} type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
-          onChange={this.selectGrain.bind(this)}/>
+          <input type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
+          onChange={this.selectGrain.bind(this, r.token)}/>
             </td> :
             [] }
           <td className="td-app-icon click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
