@@ -364,9 +364,9 @@ class Description extends React.Component {
   render () {
     if (this.state.editing) {
       return <form className="description-row" onSubmit={this.submitEdit.bind(this)}>
-        <textarea onChange={this.changeDesc.bind(this)}
-               defaultValue={this.props.description}>
-        </textarea>
+        <input type="text" onChange={this.changeDesc.bind(this)}
+               defaultValue={this.props.description} autoFocus={true}>
+        </input>
         <button className="secondary-button" title="done editing">done</button>
         </form>;
     } else if (this.props.description && this.props.description.length > 0) {
