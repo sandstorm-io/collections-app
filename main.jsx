@@ -433,7 +433,7 @@ class Main extends React.Component {
         } else {
           newDelay = delayOnFailure * 2;
         }
-        console.log("websocket failed to connect. Retrying in " + delayOnFailure + "milliseconds");
+        console.log("websocket failed to connect. Retrying in " + delayOnFailure + " milliseconds");
       }
       this.setState({ socketReadyState: "closed" });
 
