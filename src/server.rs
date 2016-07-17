@@ -296,19 +296,24 @@ impl SavedUiViewSet {
                 Some(s) => s.into(),
             };
 
-            let mut reader = try!(::std::fs::File::open(dir_entry.path()));
-            let message = try!(::capnp::serialize::read_message(&mut reader, Default::default()));
-            let metadata: ui_view_metadata::Reader = try!(message.get_root());
+            if token.ends_with(".uploading") {
+                try!(::std::fs::remove_file(dir_entry.path()));
+            } else {
+                let mut reader = try!(::std::fs::File::open(dir_entry.path()));
+                let message = try!(::capnp::serialize::read_message(&mut reader,
+                                                                    Default::default()));
+                let metadata: ui_view_metadata::Reader = try!(message.get_root());
 
-            let entry = SavedUiViewData {
-                title: try!(metadata.get_title()).into(),
-                date_added: metadata.get_date_added(),
-                added_by: try!(metadata.get_added_by()).into(),
-            };
+                let entry = SavedUiViewData {
+                    title: try!(metadata.get_title()).into(),
+                    date_added: metadata.get_date_added(),
+                    added_by: try!(metadata.get_added_by()).into(),
+                };
 
-            result.borrow_mut().views.insert(token.clone(), entry);
+                result.borrow_mut().views.insert(token.clone(), entry);
 
-            try!(SavedUiViewSet::retrieve_view_info(&result, token));
+                try!(SavedUiViewSet::retrieve_view_info(&result, token));
+            }
         }
 
         Ok(result)
@@ -372,7 +377,6 @@ impl SavedUiViewSet {
         try!(try!(::std::fs::File::create(&temp_path)).write_all(description));
         try!(::std::fs::rename(temp_path, "/var/description"));
 
-
         self.description = desc_string;
 
         let json_string = Action::Description(self.description.clone()).to_json();
@@ -390,17 +394,27 @@ impl SavedUiViewSet {
         let mut token_path = ::std::path::PathBuf::new();
         token_path.push(self.base_path.clone());
         token_path.push(token.clone());
-        let mut writer = try!(::std::fs::File::create(token_path));
 
-        let mut message = ::capnp::message::Builder::new_default();
+        let mut temp_path = ::std::path::PathBuf::new();
+        temp_path.push(self.base_path.clone());
+        temp_path.push(format!("{}.uploading", token));
+
         {
-            let mut metadata: ui_view_metadata::Builder = message.init_root();
-            metadata.set_title(&title);
-            metadata.set_date_added(date_added);
-            metadata.set_added_by(&added_by);
+            let mut writer = try!(::std::fs::File::create(&temp_path));
+
+            let mut message = ::capnp::message::Builder::new_default();
+            {
+                let mut metadata: ui_view_metadata::Builder = message.init_root();
+                metadata.set_title(&title);
+                metadata.set_date_added(date_added);
+                metadata.set_added_by(&added_by);
+            }
+
+            try!(::capnp::serialize::write_message(&mut writer, &message));
+            try!(writer.sync_all());
         }
 
-        try!(::capnp::serialize::write_message(&mut writer, &message));
+        try!(::std::fs::rename(temp_path, token_path));
 
         let entry = SavedUiViewData {
             title: title,
