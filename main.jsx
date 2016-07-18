@@ -351,9 +351,16 @@ class Description extends React.Component {
     this.setState({ editing: true, editedDescription: this.props.description });
   }
 
+  clickCancel(e) {
+    e.preventDefault();
+    this.setState({ editing: false, editedDescription: this.props.description });
+  }
+
   submitEdit(e) {
     e.preventDefault();
-    http("/description", "put", this.state.editedDescription);
+    if (this.state.editedDescription !== this.props.description) {
+      http("/description", "put", this.state.editedDescription);
+    }
     this.setState({ editing: false });
   }
 
@@ -367,8 +374,10 @@ class Description extends React.Component {
         <input type="text" onChange={this.changeDesc.bind(this)}
                defaultValue={this.props.description} autoFocus={true}>
         </input>
-        <button className="secondary-button" title="done editing">done</button>
-        </form>;
+        <button className="primary-button" title="done editing">done</button>
+        <button className="secondary-button" title="cancel"
+                onClick={this.clickCancel.bind(this)}>cancel</button>
+       </form>;
     } else if (this.props.description && this.props.description.length > 0) {
       let button = [];
       if (this.props.canWrite) {

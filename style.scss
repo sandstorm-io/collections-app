@@ -192,6 +192,11 @@ button.secondary-button {
   @extend %button-secondary;
 }
 
+button.primary-button {
+  @extend %button-base;
+  @extend %button-primary;
+}
+
 .description-row {
   display: flex;
   align-items: center;
