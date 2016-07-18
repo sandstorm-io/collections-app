@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generator: Adobe Illustrator 19.2.1, SVG Export Plug-In . SVG Version: 6.00 Build 0)  -->
+<svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+	 viewBox="0 0 150 150" style="enable-background:new 0 0 150 150;" xml:space="preserve">
+<style type="text/css">
+	.st0{fill:url(#SVGID_1_);}
+	.st1{fill:#1E102B;}
+	.st2{opacity:0.6;fill:url(#SVGID_4_);}
+	.st3{fill:#3F2977;}
+	.st4{opacity:0.6;fill:url(#SVGID_11_);}
+	.st5{fill:#664BA0;}
+</style>
+<linearGradient id="SVGID_1_" gradientUnits="userSpaceOnUse" x1="-1.682565e-009" y1="149.9724" x2="149.9724" y2="1.683560e-009">
+	<stop  offset="0" style="stop-color:#D0C8E8"/>
+	<stop  offset="0.5018" style="stop-color:#E9E6F4"/>
+	<stop  offset="1" style="stop-color:#FFFFFF"/>
+</linearGradient>
+<rect class="st0" width="150" height="150"/>
+<g>
+	<g>
+		<defs>
+			<polyline id="SVGID_2_" points="150,0 0,0 0,150 150,150 150,0 			"/>
+		</defs>
+		<clipPath id="SVGID_3_">
+			<use xlink:href="#SVGID_2_"  style="overflow:visible;"/>
+		</clipPath>
+	</g>
+</g>
+<polyline class="st1" points="132,18.5 53.4,18.5 53.4,32.3 53.4,97 118.1,97 132,97 132,18.5 "/>
+<linearGradient id="SVGID_4_" gradientUnits="userSpaceOnUse" x1="100.2541" y1="104.838" x2="75.0241" y2="35.5191">
+	<stop  offset="0" style="stop-color:#000000"/>
+	<stop  offset="1" style="stop-color:#000000;stop-opacity:0"/>
+</linearGradient>
+<rect x="53.4" y="43.4" class="st2" width="68.4" height="53.6"/>
+<g>
+	<g>
+		<defs>
+			<polyline id="SVGID_5_" points="150,0 0,0 0,150 150,150 150,0 			"/>
+		</defs>
+		<clipPath id="SVGID_6_">
+			<use xlink:href="#SVGID_5_"  style="overflow:visible;"/>
+		</clipPath>
+	</g>
+</g>
+<g>
+	<g>
+		<defs>
+			<polyline id="SVGID_7_" points="150,0 0,0 0,150 150,150 150,0 			"/>
+		</defs>
+		<clipPath id="SVGID_8_">
+			<use xlink:href="#SVGID_7_"  style="overflow:visible;"/>
+		</clipPath>
+	</g>
+</g>
+<g>
+	<defs>
+		<path id="SVGID_9_" d="M149-1.5"/>
+	</defs>
+	<clipPath id="SVGID_10_">
+		<use xlink:href="#SVGID_9_"  style="overflow:visible;"/>
+	</clipPath>
+</g>
+<polyline class="st3" points="114.3,36.2 35.7,36.2 35.7,50.1 35.7,114.7 100.4,114.7 114.3,114.7 114.3,36.2 "/>
+<linearGradient id="SVGID_11_" gradientUnits="userSpaceOnUse" x1="82.548" y1="122.5639" x2="57.318" y2="53.245">
+	<stop  offset="0" style="stop-color:#361856"/>
+	<stop  offset="1" style="stop-color:#361856;stop-opacity:0"/>
+</linearGradient>
+<rect x="35.7" y="61.1" class="st4" width="68.4" height="53.6"/>
+<rect x="17.6" y="53.9" class="st5" width="78.9" height="78.6"/>
+</svg>
