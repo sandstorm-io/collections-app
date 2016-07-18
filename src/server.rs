@@ -238,7 +238,7 @@ impl ::gj::TaskReaper<(), Error> for Reaper {
 }
 
 pub struct SavedUiViewSet {
-    base_path: ::std::path::PathBuf,
+    sturdyref_dir: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
     view_infos: HashMap<String, ViewInfoData>,
     next_id: u64,
@@ -274,7 +274,7 @@ impl SavedUiViewSet {
         };
 
         let result = Rc::new(RefCell::new(SavedUiViewSet {
-            base_path: token_directory.as_ref().to_path_buf(),
+            sturdyref_dir: token_directory.as_ref().to_path_buf(),
             views: HashMap::new(),
             view_infos: HashMap::new(),
             next_id: 0,
@@ -393,11 +393,11 @@ impl SavedUiViewSet {
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
-        token_path.push(self.base_path.clone());
+        token_path.push(self.sturdyref_dir.clone());
         token_path.push(token.clone());
 
         let mut temp_path = ::std::path::PathBuf::new();
-        temp_path.push(self.base_path.clone());
+        temp_path.push(self.sturdyref_dir.clone());
         temp_path.push(format!("{}.uploading", token));
 
         let mut writer = try!(::std::fs::File::create(&temp_path));
@@ -436,7 +436,7 @@ impl SavedUiViewSet {
     }
 
     fn remove(&mut self, token: &str) -> Result<(), Error> {
-        let mut path = self.base_path.clone();
+        let mut path = self.sturdyref_dir.clone();
         path.push(token);
         if let Err(e) = ::std::fs::remove_file(path) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
