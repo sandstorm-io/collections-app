@@ -570,8 +570,6 @@ impl web_session::Server for WebSession {
         let path = pry!(pry!(params.get()).get_path());
         pry!(self.require_canonical_path(path));
 
-        println!("PATH {}", path);
-
         if path == "" {
             let text = "<!DOCTYPE html>\
                        <html><head>\
@@ -675,7 +673,6 @@ impl web_session::Server for WebSession {
                 let mut req = context.activity_request();
                 req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
                 req.send().promise.then(move |_| {
-                    println!("remove grain!");
                     results.get().init_no_content();
                     Promise::ok(())
                 })
@@ -768,8 +765,6 @@ impl WebSession {
                              mut results: web_session::PostResults)
                              -> Promise<(), Error>
     {
-        println!("token: {}", token);
-
         let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
 
         let decoded_content = match base64::FromBase64::from_base64(content) {
@@ -794,11 +789,8 @@ impl WebSession {
         let saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
         let do_stuff = req.send().promise.then(move |response| {
-            println!("restored!");
             let sealed_ui_view: ui_view::Client =
                 pry!(pry!(response.get()).get_cap().get_as_capability());
-            println!("got the cap!");
-
             let mut req = sandstorm_api.save_request();
             req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
             {
