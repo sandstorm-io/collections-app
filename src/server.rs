@@ -435,7 +435,9 @@ impl SavedUiViewSet {
     }
 
     fn remove(&mut self, token: &str) -> Result<(), Error> {
-        if let Err(e) = ::std::fs::remove_file(format!("/var/sturdyrefs/{}", token)) {
+        let mut path = self.base_path.clone();
+        path.push(token);
+        if let Err(e) = ::std::fs::remove_file(path) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
                 return Err(e.into())
             }
