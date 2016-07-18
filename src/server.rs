@@ -39,6 +39,7 @@ use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
 const ADD_GRAIN_ACTIVITY_INDEX: u16 = 0;
 const REMOVE_GRAIN_ACTIVITY_INDEX: u16 = 1;
+const EDIT_DESCRIPTION_ACTIVITY_INDEX: u16 = 2;
 
 pub struct WebSocketStream {
     id: u64,
@@ -627,12 +628,21 @@ impl web_session::Server for WebSession {
         if !self.can_write {
             results.get().init_client_error()
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
+            Promise::ok(())
         } else if path == "description" {
             let content = pry!(pry!(params.get_content()).get_content());
             pry!(self.saved_ui_views.borrow_mut().update_description(content));
-            results.get().init_no_content();
+            let mut req = self.context.activity_request();
+            req.get().init_event().set_type(EDIT_DESCRIPTION_ACTIVITY_INDEX);
+            req.send().promise.then(move |_| {
+                results.get().init_no_content();
+                Promise::ok(())
+            })
+        } else {
+            results.get().init_client_error()
+                .set_status_code(web_session::response::ClientErrorCode::Forbidden);
+            Promise::ok(())
         }
-        Promise::ok(())
     }
 
     fn delete(&mut self,
@@ -925,7 +935,7 @@ impl ui_view::Server for UiView {
         }
 
         {
-            let mut event_types = view_info.init_event_types(2);
+            let mut event_types = view_info.init_event_types(3);
             {
                 let mut added = event_types.borrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
                 added.set_name("add");
@@ -935,6 +945,11 @@ impl ui_view::Server for UiView {
                 let mut removed = event_types.borrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
                 removed.set_name("remove");
                 removed.borrow().init_verb_phrase().set_default_text("grain removed");
+            }
+            {
+                let mut removed = event_types.borrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
+                removed.set_name("description");
+                removed.borrow().init_verb_phrase().set_default_text("description edited");
             }
         }
 
