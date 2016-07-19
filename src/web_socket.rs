@@ -25,6 +25,37 @@ use std::cell::Cell;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
+pub fn encode_text_message(mut params: web_socket_stream::send_bytes_params::Builder,
+                           message: &str)
+{
+    // TODO(perf) avoid this allocation
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.push(0x81);
+    if message.len() < 126 {
+        bytes.push(message.len() as u8);
+    } else if message.len() < 1 << 16  {
+        // 16 bits
+        bytes.push(0x7e);
+        bytes.push((message.len() >> 8) as u8);
+        bytes.push(message.len() as u8);
+    } else {
+        // 64 bits
+        bytes.push(0x7f);
+        bytes.push((message.len() >> 56) as u8);
+        bytes.push((message.len() >> 48) as u8);
+        bytes.push((message.len() >> 40) as u8);
+        bytes.push((message.len() >> 32) as u8);
+        bytes.push((message.len() >> 16) as u8);
+        bytes.push((message.len() >> 24) as u8);
+        bytes.push((message.len() >> 8) as u8);
+        bytes.push(message.len() as u8);
+    }
+
+    bytes.extend_from_slice(message.as_bytes());
+
+    params.set_message(&bytes[..]);
+}
+
 pub enum Message {
   Text(String),
   Data(Vec<u8>),

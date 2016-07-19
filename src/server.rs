@@ -79,37 +79,6 @@ impl web_socket::MessageHandler for WebSocketStream {
     }
 }
 
-fn encode_websocket_message(mut params: web_socket_stream::send_bytes_params::Builder,
-                            message: &str)
-{
-    // TODO(perf) avoid this allocation
-    let mut bytes: Vec<u8> = Vec::new();
-    bytes.push(0x81);
-    if message.len() < 126 {
-        bytes.push(message.len() as u8);
-    } else if message.len() < 1 << 16  {
-        // 16 bits
-        bytes.push(0x7e);
-        bytes.push((message.len() >> 8) as u8);
-        bytes.push(message.len() as u8);
-    } else {
-        // 64 bits
-        bytes.push(0x7f);
-        bytes.push((message.len() >> 56) as u8);
-        bytes.push((message.len() >> 48) as u8);
-        bytes.push((message.len() >> 40) as u8);
-        bytes.push((message.len() >> 32) as u8);
-        bytes.push((message.len() >> 16) as u8);
-        bytes.push((message.len() >> 24) as u8);
-        bytes.push((message.len() >> 8) as u8);
-        bytes.push(message.len() as u8);
-    }
-
-    bytes.extend_from_slice(message.as_bytes());
-
-    params.set_message(&bytes[..]);
-}
-
 #[derive(Clone)]
 struct SavedUiViewData {
     title: String,
@@ -383,7 +352,7 @@ impl SavedUiViewSet {
     fn send_message_to_subscribers(&mut self, message: &str) {
         for (_, sub) in &self.subscribers {
             let mut req = sub.send_bytes_request();
-            encode_websocket_message(req.get(), message);
+            web_socket::encode_text_message(req.get(), message);
             self.tasks.add(req.send().promise.map(|_| Ok(())));
         }
     }
@@ -419,7 +388,7 @@ impl SavedUiViewSet {
         {
             let json_string = Action::CanWrite(can_write).to_json();
             let mut req = client_stream.send_bytes_request();
-            encode_websocket_message(req.get(), &json_string);
+            web_socket::encode_text_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
             task = task.then(|_| promise);
         }
@@ -427,7 +396,7 @@ impl SavedUiViewSet {
         {
             let json_string = Action::Description(set.borrow().description.clone()).to_json();
             let mut req = client_stream.send_bytes_request();
-            encode_websocket_message(req.get(), &json_string);
+            web_socket::encode_text_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
             task = task.then(|_| promise);
         }
@@ -440,7 +409,7 @@ impl SavedUiViewSet {
 
             let json_string = action.to_json();
             let mut req = client_stream.send_bytes_request();
-            encode_websocket_message(req.get(), &json_string);
+            web_socket::encode_text_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
             task = task.then(|_| promise);
         }
@@ -453,7 +422,7 @@ impl SavedUiViewSet {
 
             let json_string = action.to_json();
             let mut req = client_stream.send_bytes_request();
-            encode_websocket_message(req.get(), &json_string);
+            web_socket::encode_text_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
             task = task.then(|_| promise);
         }
