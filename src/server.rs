@@ -67,7 +67,14 @@ impl WebSocketStream {
 }
 
 impl web_socket::MessageHandler for WebSocketStream {
-    fn handle_message(&mut self, _message: web_socket::Message) -> Promise<(), Error> {
+    fn handle_message(&mut self, message: web_socket::Message) -> Promise<(), Error> {
+        // TODO: move PUTs and POSTs into websocket requests?
+        match message {
+            web_socket::Message::Text(_t) => {
+            }
+            web_socket::Message::Data(_d) => {
+            }
+        }
         Promise::ok(())
     }
 }
