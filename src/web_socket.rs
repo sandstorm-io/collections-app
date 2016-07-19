@@ -340,10 +340,21 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                                                  previous frames.")));
                                 }
                                 &mut PreviousFrames::Data(ref mut data) => {
-                                    data.extend_from_slice(&frame[..])
+                                    data.extend_from_slice(&frame[..]);
+                                    if data.len() > (1 << 20) { // 1 MB
+                                        return Promise::err(Error::failed(
+                                            format!("Websocket message is too big. Please split \
+                                                     the message into chunks smaller than 1MB.")));
+                                    }
                                 }
                                 &mut PreviousFrames::Text(ref mut text) => {
-                                    text.push_str(&pry!(String::from_utf8(frame)))
+                                    text.push_str(&pry!(String::from_utf8(frame)));
+                                    if text.len() > (1 << 20) { // 1 MB
+                                        return Promise::err(Error::failed(
+                                            format!("Websocket message is too big. Please split \
+                                                     the message into chunks smaller than 1MB.")));
+                                    }
+
                                 }
                             }
 
