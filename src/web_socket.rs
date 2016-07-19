@@ -54,9 +54,9 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
 }
 
 pub struct Adapter<T> where T: MessageHandler {
-    handler: T,
+    handler: Option<T>,
     awaiting_pong: Rc<Cell<bool>>,
-    _ping_pong_promise: Promise<(), Error>,
+    ping_pong_promise: Promise<(), Error>,
 }
 
 impl <T> Adapter<T> where T: MessageHandler {
@@ -73,9 +73,9 @@ impl <T> Adapter<T> where T: MessageHandler {
         }).eagerly_evaluate();
 
         Adapter {
-            handler: handler,
+            handler: Some(handler),
             awaiting_pong: awaiting,
-            _ping_pong_promise: ping_pong_promise,
+            ping_pong_promise: ping_pong_promise,
         }
     }
 }
@@ -137,7 +137,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
             0x2 => { // BINARY PAYLOAD
             }
             0x8 => { // TERMINATE
-                // TODO: drop things to get them to close.
+                self.handler = None;
+                self.ping_pong_promise = Promise::ok(())
             }
             0x9 => { // PING
                 //TODO
