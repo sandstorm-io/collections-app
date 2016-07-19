@@ -25,12 +25,28 @@ use std::cell::Cell;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
-pub fn encode_text_message(mut params: web_socket_stream::send_bytes_params::Builder,
+#[repr(u8)]
+pub enum OpCode {
+    Continue = 0,
+    Utf8Payload = 1,
+    BinaryPayload = 2,
+    Terminate = 8,
+    Ping = 9,
+    Pong = 10,
+}
+
+pub fn encode_text_message(params: web_socket_stream::send_bytes_params::Builder,
                            message: &str)
+{
+    encode_message(params, OpCode::Utf8Payload, message.as_bytes())
+}
+
+pub fn encode_message(mut params: web_socket_stream::send_bytes_params::Builder,
+                      opcode: OpCode, message: &[u8])
 {
     // TODO(perf) avoid this allocation
     let mut bytes: Vec<u8> = Vec::new();
-    bytes.push(0x81);
+    bytes.push(0x80 | opcode as u8);
     if message.len() < 126 {
         bytes.push(message.len() as u8);
     } else if message.len() < 1 << 16  {
@@ -51,7 +67,7 @@ pub fn encode_text_message(mut params: web_socket_stream::send_bytes_params::Bui
         bytes.push(message.len() as u8);
     }
 
-    bytes.extend_from_slice(message.as_bytes());
+    bytes.extend_from_slice(message);
 
     params.set_message(&bytes[..]);
 }
@@ -245,6 +261,7 @@ pub struct Adapter<T> where T: MessageHandler {
     handler: Option<T>,
     awaiting_pong: Rc<Cell<bool>>,
     ping_pong_promise: Promise<(), Error>,
+    client_stream: Option<web_socket_stream::Client>,
     parser_state: ParserState,
     previous_frames: PreviousFrames,
 }
@@ -271,6 +288,7 @@ impl <T> Adapter<T> where T: MessageHandler {
             handler: Some(handler),
             awaiting_pong: awaiting,
             ping_pong_promise: ping_pong_promise,
+            client_stream: Some(client_stream),
             parser_state: ParserState::NotStarted,
             previous_frames: PreviousFrames::None,
         }
@@ -305,7 +323,7 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                   -> Promise<(), Error>
     {
         let message = pry!(pry!(params.get()).get_message());
-        let mut result_promises = Vec::<Promise<(), Error>>::new();
+        let mut result_promise = Promise::ok(());
         let mut num_bytes_read = 0;
         while num_bytes_read < message.len() {
             let (n, result) = self.parser_state.advance(&message[num_bytes_read..]);
@@ -330,7 +348,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                             }
 
                             if fin {
-                                result_promises.push(self.process_message());
+                                let promise = self.process_message();
+                                result_promise = result_promise.then(|_| promise);
                             }
                         }
                         0x1 => { // UTF-8 PAYLOAD
@@ -338,23 +357,33 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                                 PreviousFrames::Text(pry!(String::from_utf8(frame)));
 
                             if fin {
-                                result_promises.push(self.process_message());
+                                let promise = self.process_message();
+                                result_promise = result_promise.then(|_| promise);
                             }
                         }
                         0x2 => { // BINARY PAYLOAD
                             self.previous_frames = PreviousFrames::Data(frame);
 
                             if fin {
-                                result_promises.push(self.process_message());
+                                let promise = self.process_message();
+                                result_promise = result_promise.then(|_| promise);
                             }
                         }
                         0x8 => { // TERMINATE
                             self.handler = None;
-                            self.ping_pong_promise = Promise::ok(())
+                            self.ping_pong_promise = Promise::ok(());
+                            self.client_stream = None;
                         }
                         0x9 => { // PING
-                            //TODO
-                            println!("the client sent us a ping!");
+                            match &self.client_stream {
+                                &None => (),
+                                &Some(ref client) => {
+                                    println!("responding to ping from client");
+                                    let req = client.send_bytes_request();
+                                    let promise = req.send().promise.map(|_| Ok(()));
+                                    result_promise = result_promise.then(|_| promise);
+                                }
+                            }
                         }
                         0xa => { // PONG
                             self.awaiting_pong.set(false);
@@ -367,6 +396,6 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
             }
         }
 
-        Promise::all(result_promises.into_iter()).map(|_| Ok(()))
+        result_promise
     }
 }
