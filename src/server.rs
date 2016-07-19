@@ -25,10 +25,12 @@ use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use rustc_serialize::{base64, hex, json};
 
 use std::collections::hash_map::HashMap;
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use collections_capnp::ui_view_metadata;
+
+use ::web_socket;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::identity_capnp::{user_info};
@@ -43,8 +45,6 @@ const EDIT_DESCRIPTION_ACTIVITY_INDEX: u16 = 2;
 
 pub struct WebSocketStream {
     id: u64,
-    awaiting_pong: Rc<Cell<bool>>,
-    _ping_pong_promise: Promise<(), Error>,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
 }
 
@@ -54,82 +54,20 @@ impl Drop for WebSocketStream {
     }
 }
 
-fn do_ping_pong(client_stream: web_socket_stream::Client,
-                timer: ::gjio::Timer,
-                awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
-{
-    let mut req = client_stream.send_bytes_request();
-    req.get().set_message(&[0x89, 0]); // PING
-    let promise = req.send().promise;
-    awaiting_pong.set(true);
-    promise.then(move|_| {
-        timer.after_delay(::std::time::Duration::new(10, 0)).lift().then(move |_| {
-            if awaiting_pong.get() {
-                Promise::err(Error::failed("pong not received within 10 seconds".into()))
-            } else {
-                do_ping_pong(client_stream, timer, awaiting_pong)
-            }
-        })
-    })
-}
-
-
 impl WebSocketStream {
     fn new(id: u64,
-           client_stream: web_socket_stream::Client,
-           timer: ::gjio::Timer,
            saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
            -> WebSocketStream
     {
-        let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = do_ping_pong(client_stream,
-                                             timer,
-                                             awaiting.clone()).map_else(|r| match r {
-            Ok(_) => Ok(()),
-            Err(e) => {println!("ERROR {}", e); Ok(())  }
-        }).eagerly_evaluate();
-
         WebSocketStream {
             id: id,
-            awaiting_pong: awaiting,
-            _ping_pong_promise: ping_pong_promise,
             saved_ui_views: saved_ui_views,
         }
     }
 }
 
-impl web_socket_stream::Server for WebSocketStream {
-    fn send_bytes(&mut self,
-                  params: web_socket_stream::SendBytesParams,
-                  _results: web_socket_stream::SendBytesResults)
-                  -> Promise<(), Error>
-    {
-        let message = pry!(pry!(params.get()).get_message());
-        let opcode = message[0] & 0xf; // or is it 0xf0?
-        let _masked = (message[1] & 0x80) != 0;
-        let _length = message[1] & 0x7f;
-
-        match opcode {
-            0x0 => { // CONTINUE
-            }
-            0x1 => { // UTF-8 PAYLOAD
-            }
-            0x2 => { // BINARY PAYLOAD
-            }
-            0x8 => { // TERMINATE
-                // TODO: drop things to get them to close.
-            }
-            0x9 => { // PING
-                //TODO
-                println!("the client sent us a ping!");
-            }
-            0xa => { // PONG
-                self.awaiting_pong.set(false);
-            }
-            _ => { // OTHER
-                println!("unrecognized websocket opcode {}", opcode);
-            }
-        }
+impl web_socket::MessageHandler for WebSocketStream {
+    fn handle_message(&mut self, _message: web_socket::Message) -> Promise<(), Error> {
         Promise::ok(())
     }
 }
@@ -462,7 +400,7 @@ impl SavedUiViewSet {
                                 client_stream: web_socket_stream::Client,
                                 can_write: bool,
                                 timer: &::gjio::Timer)
-                                 -> WebSocketStream
+                                 -> web_socket_stream::Client
     {
         let id = set.borrow().next_id;
         set.borrow_mut().next_id = id + 1;
@@ -515,7 +453,11 @@ impl SavedUiViewSet {
 
         set.borrow_mut().tasks.add(task);
 
-        WebSocketStream::new(id, client_stream, timer.clone(), set.clone())
+        web_socket_stream::ToClient::new(
+            web_socket::Adapter::new(
+                WebSocketStream::new(id, set.clone()),
+                client_stream,
+                timer.clone())).from_server::<::capnp_rpc::Server>()
     }
 }
 
@@ -705,12 +647,11 @@ impl web_session::Server for WebSession {
         let client_stream = pry!(pry!(params.get()).get_client_stream());
 
         results.get().set_server_stream(
-            web_socket_stream::ToClient::new(
-                SavedUiViewSet::new_subscribed_websocket(
-                    &self.saved_ui_views,
-                    client_stream,
-                    self.can_write,
-                    &self.timer)).from_server::<::capnp_rpc::Server>());
+            SavedUiViewSet::new_subscribed_websocket(
+                &self.saved_ui_views,
+                client_stream,
+                self.can_write,
+                &self.timer));
 
         Promise::ok(())
     }

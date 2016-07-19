@@ -30,6 +30,7 @@ pub mod collections_capnp {
   include!(concat!(env!("OUT_DIR"), "/collections_capnp.rs"));
 }
 
+pub mod web_socket;
 pub mod server;
 
 fn main() {
