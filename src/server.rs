@@ -238,6 +238,7 @@ impl ::gj::TaskReaper<(), Error> for Reaper {
 }
 
 pub struct SavedUiViewSet {
+    tmp_dir: ::std::path::PathBuf,
     sturdyref_dir: ::std::path::PathBuf,
     views: HashMap<String, SavedUiViewData>,
     view_infos: HashMap<String, ViewInfoData>,
@@ -249,10 +250,12 @@ pub struct SavedUiViewSet {
 }
 
 impl SavedUiViewSet {
-    pub fn new<P>(token_directory: P,
-                  sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
+    pub fn new<P1, P2>(tmp_dir: P1,
+                       sturdyref_dir: P2,
+                       sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
                   -> ::capnp::Result<Rc<RefCell<SavedUiViewSet>>>
-        where P: AsRef<::std::path::Path>
+        where P1: AsRef<::std::path::Path>,
+              P2: AsRef<::std::path::Path>
     {
         let description = match ::std::fs::File::open("/var/description") {
             Ok(mut f) => {
@@ -274,7 +277,8 @@ impl SavedUiViewSet {
         };
 
         let result = Rc::new(RefCell::new(SavedUiViewSet {
-            sturdyref_dir: token_directory.as_ref().to_path_buf(),
+            tmp_dir: tmp_dir.as_ref().to_path_buf(),
+            sturdyref_dir: sturdyref_dir.as_ref().to_path_buf(),
             views: HashMap::new(),
             view_infos: HashMap::new(),
             next_id: 0,
@@ -284,10 +288,14 @@ impl SavedUiViewSet {
             sandstorm_api: sandstorm_api,
         }));
 
-        // create token directory if it does not yet exist
-        try!(::std::fs::create_dir_all(&token_directory));
+        // create sturdyref directory if it does not yet exist
+        try!(::std::fs::create_dir_all(&sturdyref_dir));
 
-        for token_file in try!(::std::fs::read_dir(&token_directory)) {
+        // clear and create tmp directory
+        try!(::std::fs::remove_dir_all(&tmp_dir));
+        try!(::std::fs::create_dir_all(&tmp_dir));
+
+        for token_file in try!(::std::fs::read_dir(&sturdyref_dir)) {
             let dir_entry = try!(token_file);
             let token: String = match dir_entry.file_name().to_str() {
                 None => {
@@ -397,7 +405,7 @@ impl SavedUiViewSet {
         token_path.push(token.clone());
 
         let mut temp_path = ::std::path::PathBuf::new();
-        temp_path.push(self.sturdyref_dir.clone());
+        temp_path.push(self.tmp_dir.clone());
         temp_path.push(format!("{}.uploading", token));
 
         let mut writer = try!(::std::fs::File::create(&temp_path));
@@ -449,7 +457,6 @@ impl SavedUiViewSet {
         self.views.remove(token);
         Ok(())
     }
-
 
     fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
                                 client_stream: web_socket_stream::Client,
@@ -996,7 +1003,9 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         let (p, f) = Promise::and_fulfiller();
         let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
             ::capnp_rpc::new_promise_client(p);
-        let saved_uiviews = try!(SavedUiViewSet::new("/var/sturdyrefs", sandstorm_api.clone()));
+        let saved_uiviews = try!(SavedUiViewSet::new("/var/tmp",
+                                                     "/var/sturdyrefs",
+                                                     sandstorm_api.clone()));
 
 
         let uiview = UiView::new(
