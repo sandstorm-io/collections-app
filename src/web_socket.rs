@@ -65,11 +65,16 @@ impl <T> Adapter<T> where T: MessageHandler {
                timer: ::gjio::Timer)
                -> Adapter<T> {
         let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = do_ping_pong(client_stream.clone(),
-                                             timer,
-                                             awaiting.clone()).map_else(|r| match r {
+        let ping_pong_promise = do_ping_pong(
+            client_stream.clone(),
+            timer,
+            awaiting.clone()
+        ).map_else(|r| match r {
             Ok(_) => Ok(()),
-            Err(e) => {println!("ERROR {}", e); Ok(())  }
+            Err(e) => {
+                println!("error while pinging client: {}", e);
+                Ok(())
+            }
         }).eagerly_evaluate();
 
         Adapter {
@@ -156,4 +161,3 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
         Promise::ok(())
     }
 }
-
