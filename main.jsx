@@ -226,7 +226,6 @@ class GrainList extends React.Component {
   }
 
   offerUiView(token) {
-    console.log("offering token:", token);
     http("/offer/" + token, "post");
   }
 

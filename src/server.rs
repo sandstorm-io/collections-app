@@ -29,8 +29,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use collections_capnp::ui_view_metadata;
-
-use ::web_socket;
+use web_socket;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::identity_capnp::{user_info};
@@ -38,10 +37,6 @@ use sandstorm::grain_capnp::{session_context, ui_view, ui_session, sandstorm_api
 use sandstorm::grain_capnp::{static_asset};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
-
-const ADD_GRAIN_ACTIVITY_INDEX: u16 = 0;
-const REMOVE_GRAIN_ACTIVITY_INDEX: u16 = 1;
-const EDIT_DESCRIPTION_ACTIVITY_INDEX: u16 = 2;
 
 pub struct WebSocketStream {
     id: u64,
@@ -154,7 +149,11 @@ impl ::gj::TaskReaper<(), Error> for Reaper {
 pub struct SavedUiViewSet {
     tmp_dir: ::std::path::PathBuf,
     sturdyref_dir: ::std::path::PathBuf,
+
+    /// Invariant: Every entry in this map has been persisted to the filesystem and has sent
+    /// out Action::Insert messages to each subscriber.
     views: HashMap<String, SavedUiViewData>,
+
     view_infos: HashMap<String, ViewInfoData>,
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
@@ -315,7 +314,8 @@ impl SavedUiViewSet {
               token: String,
               title: String,
               added_by: String) -> ::capnp::Result<()> {
-        let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH).expect("TODO");
+        let dur = try!(::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH)
+            .map_err(|e| Error::failed(format!("{}", e))));
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
@@ -440,6 +440,10 @@ impl SavedUiViewSet {
                 timer.clone())).from_server::<::capnp_rpc::Server>()
     }
 }
+
+const ADD_GRAIN_ACTIVITY_INDEX: u16 = 0;
+const REMOVE_GRAIN_ACTIVITY_INDEX: u16 = 1;
+const EDIT_DESCRIPTION_ACTIVITY_INDEX: u16 = 2;
 
 pub struct WebSession {
     timer: ::gjio::Timer,
@@ -907,7 +911,7 @@ impl ui_view::Server for UiView {
         let client: web_session::Client =
             web_session::ToClient::new(session).from_server::<::capnp_rpc::Server>();
 
-        // we need to do this dance to upcast.
+        // We need to do this silly dance to upcast.
         results.get().set_session(ui_session::Client { client : client.client});
         Promise::ok(())
     }
