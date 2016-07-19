@@ -206,7 +206,11 @@ impl SavedUiViewSet {
         try!(::std::fs::create_dir_all(&sturdyref_dir));
 
         // clear and create tmp directory
-        try!(::std::fs::remove_dir_all(&tmp_dir));
+        match ::std::fs::remove_dir_all(&tmp_dir) {
+            Ok(()) => (),
+            Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => (),
+            Err(e) => return Err(e.into()),
+        }
         try!(::std::fs::create_dir_all(&tmp_dir));
 
         for token_file in try!(::std::fs::read_dir(&sturdyref_dir)) {
