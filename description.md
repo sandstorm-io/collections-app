@@ -1,0 +1,1 @@
+Collect many grains into a single grain and then share them as a unit.

@@ -7,8 +7,8 @@ const pkgdef :Spk.PackageDefinition = (
 
   manifest = (
     appTitle = (defaultText = "Collections"),
-    appVersion = 1,  # Increment this for every release.
-    appMarketingVersion = (defaultText = "0.0.1"),
+    appVersion = 2,  # Increment this for every release.
+    appMarketingVersion = (defaultText = "0.0.2"),
 
     actions = [
       (
@@ -36,25 +36,17 @@ const pkgdef :Spk.PackageDefinition = (
       website = "https://sandstorm.io",
       codeUrl = "https://github.com/dwrensha/sandstorm-collections-app",
       license = (openSource = mit),
-
       categories = [productivity],
-      # A list of categories/genres to which this app belongs, sorted with best fit first.
-      # See the list of categories at
-      # https://docs.sandstorm.io/en/latest/developing/publishing-apps/#categories
 
       author = (
         upstreamAuthor = "David Renshaw",
         contactEmail = "david@sandstorm.io",
-
         pgpSignature = embed "pgp-signature",
       ),
 
       pgpKeyring = embed "pgp-keyring",
 
-      #description = (defaultText = embed "path/to/description.md"),
-      # The app's description in Github-flavored Markdown format, to be displayed e.g.
-      # in an app store. Note that the Markdown is not permitted to contain HTML nor image tags (but
-      # you can include a list of screenshots separately).
+      description = (defaultText = embed "description.md"),
 
       shortDescription = (defaultText = "grain list sharing"),
       # A very short (one-to-three words) description of what the app does. For example,
@@ -69,10 +61,7 @@ const pkgdef :Spk.PackageDefinition = (
         #(width = 746, height = 795, jpeg = embed "path/to/screenshot-1.jpeg"),
         #(width = 640, height = 480, png = embed "path/to/screenshot-2.png"),
       ],
-      #changeLog = (defaultText = embed "path/to/sandstorm-specific/changelog.md"),
-      # Documents the history of changes in Github-flavored markdown format (with the same restrictions
-      # as govern `description`). We recommend formatting this with an H1 heading for each version
-      # followed by a bullet list of changes.
+      changeLog = (defaultText = embed "CHANGELOG.md"),
     ),
   ),
 
