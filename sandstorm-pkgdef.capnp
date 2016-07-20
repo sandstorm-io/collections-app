@@ -48,7 +48,7 @@ const pkgdef :Spk.PackageDefinition = (
 
       description = (defaultText = embed "description.md"),
 
-      shortDescription = (defaultText = "grain list sharing"),
+      shortDescription = (defaultText = "Grain list sharing"),
       # A very short (one-to-three words) description of what the app does. For example,
       # "Document editor", or "Notetaking", or "Email client". This will be displayed under the app
       # title in the grid view in the app market.
