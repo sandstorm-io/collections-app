@@ -46,30 +46,10 @@ const pkgdef :Spk.PackageDefinition = (
         upstreamAuthor = "David Renshaw",
         contactEmail = "david@sandstorm.io",
 
-        #pgpSignature = embed "path/to/pgp-signature",
-        # PGP signature attesting responsibility for the app ID. This is a binary-format detached
-        # signature of the following ASCII message (not including the quotes, no newlines, and
-        # replacing <app-id> with the standard base-32 text format of the app's ID):
-        #
-        # "I am the author of the Sandstorm.io app with the following ID: <app-id>"
-        #
-        # You can create a signature file using `gpg` like so:
-        #
-        #     echo -n "I am the author of the Sandstorm.io app with the following ID: <app-id>" | gpg --sign > pgp-signature
-        #
-        # Further details including how to set up GPG and how to use keybase.io can be found
-        # at https://docs.sandstorm.io/en/latest/developing/publishing-apps/#verify-your-identity
+        pgpSignature = embed "pgp-signature",
       ),
 
-      #pgpKeyring = embed "path/to/pgp-keyring",
-      # A keyring in GPG keyring format containing all public keys needed to verify PGP signatures in
-      # this manifest (as of this writing, there is only one: `author.pgpSignature`).
-      #
-      # To generate a keyring containing just your public key, do:
-      #
-      #     gpg --export <key-id> > keyring
-      #
-      # Where `<key-id>` is a PGP key ID or email address associated with the key.
+      pgpKeyring = embed "pgp-keyring",
 
       #description = (defaultText = embed "path/to/description.md"),
       # The app's description in Github-flavored Markdown format, to be displayed e.g.
