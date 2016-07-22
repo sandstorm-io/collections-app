@@ -245,6 +245,10 @@ impl SavedUiViewSet {
         Ok(result)
     }
 
+    fn get_saved_data<'a>(&'a self, token: &'a String) -> Option<&'a SavedUiViewData> {
+        self.views.get(token)
+    }
+
     fn retrieve_view_info(set_ref: &Rc<RefCell<SavedUiViewSet>>,
                           token: String) -> ::capnp::Result<()> {
         // SandstormApi.restore, then call getViewInfo,
@@ -539,7 +543,17 @@ impl web_session::Server for WebSession {
         if path.starts_with("token/") {
             self.receive_request_token(path[6..].to_string(), params, results)
         } else if path.starts_with("offer/") {
-            self.offer_ui_view(path[6..].to_string(), params, results)
+            let token = path[6..].to_string();
+            let title = match self.saved_ui_views.borrow().get_saved_data(&token) {
+                None => {
+                    let mut error = results.get().init_client_error();
+                    error.set_status_code(web_session::response::ClientErrorCode::NotFound);
+                    return Promise::ok(())
+                }
+                Some(saved_ui_view) => saved_ui_view.title.to_string(),
+            };
+
+            self.offer_ui_view(token, title, params, results)
         } else {
             let mut error = results.get().init_client_error();
             error.set_status_code(web_session::response::ClientErrorCode::NotFound);
@@ -650,6 +664,7 @@ fn fill_in_client_error(mut results: web_session::PostResults, e: Error)
 impl WebSession {
     fn offer_ui_view(&mut self,
                      text_token: String,
+                     title: String,
                      _params: web_session::PostParams,
                      mut results: web_session::PostResults)
                      -> Promise<(), Error>
@@ -670,7 +685,10 @@ impl WebSession {
             {
                 use capnp::traits::HasTypeId;
                 let tags = req.get().init_descriptor().init_tags(1);
-                tags.get(0).set_id(ui_view::Client::type_id());
+                let mut tag = tags.get(0);
+                tag.set_id(ui_view::Client::type_id());
+                let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
+                value.set_title(&title);
             }
 
             req.send().promise
