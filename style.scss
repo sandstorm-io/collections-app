@@ -181,12 +181,6 @@ body {
  padding: 32px 32px;
 }
 
-a {
-  font-weight: bold;
-  text-decoration: none;
-  color: $darker-purple-color;
-}
-
 button.secondary-button {
   @extend %button-base;
   @extend %button-secondary;
@@ -423,6 +417,12 @@ button.primary-button {
     &.grain {
       .click-to-go {
         cursor: pointer;
+        button {
+          @extend %unstyled-button;
+          font-weight: bold;
+          text-decoration: none;
+          color: $darker-purple-color;
+        }
       }
       &:hover {
         background-color: $grainlist-table-row-background-color-hover;

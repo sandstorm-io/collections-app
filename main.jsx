@@ -283,7 +283,7 @@ class GrainList extends React.Component {
               <img title={r.info.appTitle} src={r.info.grainIconUrl} className="grain-icon"></img>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
-              <a href="/" onClick={(e) => {e.preventDefault();} }>{r.grain.title}</a>
+              <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
           </td>
           <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
               {makeDateString(new Date(parseInt(r.grain.dateAdded)))}
