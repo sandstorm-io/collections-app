@@ -878,6 +878,7 @@ impl ui_view::Server for UiView {
             }
             {
                 let mut viewer = roles.get(1);
+                viewer.set_default(true);
                 viewer.borrow().init_title().set_default_text("viewer");
                 viewer.borrow().init_verb_phrase().set_default_text("can view");
                 viewer.init_permissions(1).set(0, false);  // does not have "write" permission
