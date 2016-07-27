@@ -286,7 +286,7 @@ class GrainList extends React.Component {
           <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
               <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
           </td>
-          <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+          <td className="click-to-go date-added" onClick={this.offerUiView.bind(this, r.token)}>
               {makeDateString(new Date(parseInt(r.grain.dateAdded)))}
           </td>
               {/*<td> {r.grain.addedBy}</td>*/}

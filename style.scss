@@ -352,6 +352,9 @@ button.primary-button {
       &.select-all-grains {
         width: 20px;
       }
+      &.date-added {
+
+      }
     }
   }
   >tbody>tr {
@@ -377,14 +380,7 @@ button.primary-button {
         width: 64px;
       }
       &.date-added {
-        width: 100px;
-      }
-      &.shared-or-owned {
-        width: 110px;
-        // The mobile viewport is too small to display this much text
-        @media #{$mobile} {
-          display: none;
-        }
+//          width: 115px;
       }
     }
     &.add-grain {

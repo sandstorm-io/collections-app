@@ -54,12 +54,7 @@ const pkgdef :Spk.PackageDefinition = (
       # title in the grid view in the app market.
 
       screenshots = [
-        # Screenshots to use for marketing purposes.  Examples below.
-        # Sizes are given in device-independent pixels, so if you took these
-        # screenshots on a Retina-style high DPI screen, divide each dimension by two.
-
-        #(width = 746, height = 795, jpeg = embed "path/to/screenshot-1.jpeg"),
-        #(width = 640, height = 480, png = embed "path/to/screenshot-2.png"),
+        (width = 1096, height = 545, png = embed "screenshots/screenshot-1.png"),
       ],
       changeLog = (defaultText = embed "CHANGELOG.md"),
     ),
