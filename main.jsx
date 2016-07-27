@@ -158,6 +158,7 @@ class GrainList extends React.Component {
   props: { grains: Immutable.Map,
            viewInfos: Immutable.Map,
            canWrite: bool,
+           userId: String,
          };
   state: { selectedGrains: Immutable.Set,
            searchString: String,
@@ -329,7 +330,7 @@ class GrainList extends React.Component {
             </tr>
           </thead>
       <tbody>
-      {(this.props.canWrite && !this.state.searchString) ? <AddGrain/>: [] }
+      {(this.props.canWrite && this.props.userId && !this.state.searchString) ? <AddGrain/>: [] }
       { grainRows }
     </tbody>
     </table>
@@ -401,6 +402,7 @@ class Description extends React.Component {
 class Main extends React.Component {
   props: {};
   state: { canWrite: bool,
+           userId: String,
            description: String,
            grains: Immutable.Map,
            viewInfos: Immutable.Map,
@@ -454,6 +456,8 @@ class Main extends React.Component {
       const action = JSON.parse(m.data);
       if (action.canWrite) {
         this.setState({canWrite: action.canWrite});
+      } else if (action.userId) {
+        this.setState({userId: action.userId});
       } else if (action.description) {
         this.setState({ description: action.description });
       } else if (action.insert) {
@@ -486,7 +490,7 @@ class Main extends React.Component {
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
       <hr/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
-                 canWrite={this.state.canWrite}/>
+                 canWrite={this.state.canWrite} userId={this.state.userId} />
       </div>;
   }
 }

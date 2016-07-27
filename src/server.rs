@@ -78,15 +78,22 @@ impl web_socket::MessageHandler for WebSocketStream {
 struct SavedUiViewData {
     title: String,
     date_added: u64,
-    added_by: String,
+    added_by: Option<String>,
+}
+
+fn optional_string_to_json(optional_string: &Option<String>) -> String {
+    match optional_string {
+        &None => "null".into(),
+        &Some(ref s) => format!("{}", json::ToJson::to_json(s)),
+    }
 }
 
 impl SavedUiViewData {
     fn to_json(&self) -> String {
-        format!("{{\"title\":{},\"dateAdded\": \"{}\",\"addedBy\":\"{}\"}}",
+        format!("{{\"title\":{},\"dateAdded\": \"{}\",\"addedBy\":{}}}",
                 json::ToJson::to_json(&self.title),
                 self.date_added,
-                self.added_by)
+                optional_string_to_json(&self.added_by))
     }
 }
 
@@ -110,6 +117,7 @@ enum Action {
     Remove { token: String },
     ViewInfo { token: String, data: ViewInfoData },
     CanWrite(bool),
+    UserId(Option<String>),
     Description(String),
 }
 
@@ -129,6 +137,9 @@ impl Action {
             }
             &Action::CanWrite(b) => {
                 format!("{{\"canWrite\":{}}}", b)
+            }
+            &Action::UserId(ref s) => {
+                format!("{{\"userId\":{}}}", optional_string_to_json(s))
             }
             &Action::Description(ref s) => {
                 format!("{{\"description\":{}}}", json::ToJson::to_json(s))
@@ -230,10 +241,16 @@ impl SavedUiViewSet {
                                                                     Default::default()));
                 let metadata: ui_view_metadata::Reader = try!(message.get_root());
 
+                let added_by = if metadata.has_added_by() {
+                    Some(try!(metadata.get_added_by()).into())
+                } else {
+                    None
+                };
+
                 let entry = SavedUiViewData {
                     title: try!(metadata.get_title()).into(),
                     date_added: metadata.get_date_added(),
-                    added_by: try!(metadata.get_added_by()).into(),
+                    added_by: added_by,
                 };
 
                 result.borrow_mut().views.insert(token.clone(), entry);
@@ -317,7 +334,7 @@ impl SavedUiViewSet {
     fn insert(&mut self,
               token: String,
               title: String,
-              added_by: String) -> ::capnp::Result<()> {
+              added_by: Option<String>) -> ::capnp::Result<()> {
         let dur = try!(::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH)
             .map_err(|e| Error::failed(format!("{}", e))));
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
@@ -337,7 +354,10 @@ impl SavedUiViewSet {
             let mut metadata: ui_view_metadata::Builder = message.init_root();
             metadata.set_title(&title);
             metadata.set_date_added(date_added);
-            metadata.set_added_by(&added_by);
+            match added_by {
+                Some(ref s) => metadata.set_added_by(s),
+                None => (),
+            }
         }
 
         try!(::capnp::serialize::write_message(&mut writer, &message));
@@ -383,6 +403,7 @@ impl SavedUiViewSet {
     fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
                                 client_stream: web_socket_stream::Client,
                                 can_write: bool,
+                                user_id: Option<String>,
                                 timer: &::gjio::Timer)
                                  -> web_socket_stream::Client
     {
@@ -395,6 +416,14 @@ impl SavedUiViewSet {
 
         {
             let json_string = Action::CanWrite(can_write).to_json();
+            let mut req = client_stream.send_bytes_request();
+            web_socket::encode_text_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task = task.then(|_| promise);
+        }
+
+        {
+            let json_string = Action::UserId(user_id).to_json();
             let mut req = client_stream.send_bytes_request();
             web_socket::encode_text_message(req.get(), &json_string);
             let promise = req.send().promise.map(|_| Ok(()));
@@ -455,7 +484,7 @@ pub struct WebSession {
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     context: session_context::Client,
     saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
-    identity_id: String,
+    identity_id: Option<String>,
 }
 
 impl WebSession {
@@ -471,13 +500,19 @@ impl WebSession {
         let permissions = try!(user_info.get_permissions());
         let can_write = permissions.len() > 0 && permissions.get(0);
 
+        let identity_id = if user_info.has_identity_id() {
+            Some(hex::ToHex::to_hex(try!(user_info.get_identity_id())))
+        } else {
+            None
+        };
+
         Ok(WebSession {
             timer: timer,
             can_write: can_write,
             sandstorm_api: sandstorm_api,
             context: context,
             saved_ui_views: saved_ui_views,
-            identity_id: hex::ToHex::to_hex(try!(user_info.get_identity_id())),
+            identity_id: identity_id,
         })
 
         // `UserInfo` is defined in `sandstorm/grain.capnp` and contains info like:
@@ -649,6 +684,7 @@ impl web_session::Server for WebSession {
                 &self.saved_ui_views,
                 client_stream,
                 self.can_write,
+                self.identity_id.clone(),
                 &self.timer));
 
         Promise::ok(())
@@ -748,6 +784,7 @@ impl WebSession {
         req.get().set_request_token(&token[..]);
         let saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
+
         let do_stuff = req.send().promise.then(move |response| {
             let sealed_ui_view: ui_view::Client =
                 pry!(pry!(response.get()).get_cap().get_as_capability());
