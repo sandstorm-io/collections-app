@@ -8,6 +8,8 @@ so that they can be shared as a single unit.
 ## Developing
 
 You will need:
+  - A recent build of [Cap'n Proto](https://github.com/sandstorm-io/capnproto) from the master branch,
+    installed such that the `capnp` executable is on your PATH.
   - A [dev install of Sandstorm](https://docs.sandstorm.io/en/latest/developing/raw-packaging-guide/)
   - [Rust](https://rust-lang.org)
   - [Node](https://nodejs.org) and [NPM](https://www.npmjs.com/)
