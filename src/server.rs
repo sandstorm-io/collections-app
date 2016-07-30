@@ -407,6 +407,16 @@ impl SavedUiViewSet {
                                 timer: &::gjio::Timer)
                                  -> web_socket_stream::Client
     {
+        fn send_action(task: Promise<(), Error>,
+                       client_stream: &web_socket_stream::Client,
+                       action: Action) -> Promise<(), Error> {
+            let json_string = action.to_json();
+            let mut req = client_stream.send_bytes_request();
+            web_socket::encode_text_message(req.get(), &json_string);
+            let promise = req.send().promise.map(|_| Ok(()));
+            task.then(|_| promise)
+        }
+
         let id = set.borrow().next_id;
         set.borrow_mut().next_id = id + 1;
 
@@ -414,54 +424,29 @@ impl SavedUiViewSet {
 
         let mut task = Promise::ok(());
 
-        {
-            let json_string = Action::CanWrite(can_write).to_json();
-            let mut req = client_stream.send_bytes_request();
-            web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| Ok(()));
-            task = task.then(|_| promise);
-        }
-
-        {
-            let json_string = Action::UserId(user_id).to_json();
-            let mut req = client_stream.send_bytes_request();
-            web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| Ok(()));
-            task = task.then(|_| promise);
-        }
-
-        {
-            let json_string = Action::Description(set.borrow().description.clone()).to_json();
-            let mut req = client_stream.send_bytes_request();
-            web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| Ok(()));
-            task = task.then(|_| promise);
-        }
+        task = send_action(task, &client_stream, Action::CanWrite(can_write));
+        task = send_action(task, &client_stream, Action::UserId(user_id));
+        task = send_action(task, &client_stream,
+                           Action::Description(set.borrow().description.clone()));
 
         for (t, v) in &set.borrow().views {
-            let action = Action::Insert {
-                token: t.clone(),
-                data: v.clone()
-            };
-
-            let json_string = action.to_json();
-            let mut req = client_stream.send_bytes_request();
-            web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| Ok(()));
-            task = task.then(|_| promise);
+            task = send_action(
+                task, &client_stream,
+                Action::Insert {
+                    token: t.clone(),
+                    data: v.clone()
+                }
+            );
         }
 
         for (t, vi) in &set.borrow().view_infos {
-            let action = Action::ViewInfo {
-                token: t.clone(),
-                data: vi.clone()
-            };
-
-            let json_string = action.to_json();
-            let mut req = client_stream.send_bytes_request();
-            web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| Ok(()));
-            task = task.then(|_| promise);
+            task = send_action(
+                task, &client_stream,
+                Action::ViewInfo {
+                    token: t.clone(),
+                    data: vi.clone(),
+                }
+            );
         }
 
         set.borrow_mut().tasks.add(task);
