@@ -300,8 +300,10 @@ impl SavedUiViewSet {
 
                     set.borrow_mut().view_infos.insert(token.clone(), info.clone());
 
-                    let json_string = Action::ViewInfo { token: token, data: info }.to_json();
-                    set.borrow_mut().send_message_to_subscribers(&json_string);
+                    set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
+                        token: token,
+                        data: info,
+                    });
 
                     Promise::ok(())
                 })
@@ -324,10 +326,8 @@ impl SavedUiViewSet {
         try!(try!(::std::fs::File::create(&temp_path)).write_all(description));
         try!(::std::fs::rename(temp_path, "/var/description"));
 
-        self.description = desc_string;
-
-        let json_string = Action::Description(self.description.clone()).to_json();
-        self.send_message_to_subscribers(&json_string);
+        self.description = desc_string.clone();
+        self.send_action_to_subscribers(Action::Description(desc_string));
         Ok(())
     }
 
@@ -370,17 +370,20 @@ impl SavedUiViewSet {
             added_by: added_by,
         };
 
-        let json_string = Action::Insert { token: token.clone(), data: entry.clone() }.to_json();
-        self.send_message_to_subscribers(&json_string);
+        self.send_action_to_subscribers(Action::Insert {
+            token: token.clone(),
+            data: entry.clone(),
+        });
         self.views.insert(token, entry);
 
         Ok(())
     }
 
-    fn send_message_to_subscribers(&mut self, message: &str) {
+    fn send_action_to_subscribers(&mut self, action: Action) {
+        let json_string = action.to_json();
         for (_, sub) in &self.subscribers {
             let mut req = sub.send_bytes_request();
-            web_socket::encode_text_message(req.get(), message);
+            web_socket::encode_text_message(req.get(), &json_string);
             self.tasks.add(req.send().promise.map(|_| Ok(())));
         }
     }
@@ -394,8 +397,7 @@ impl SavedUiViewSet {
             }
         }
 
-        let json_string = Action::Remove { token: token.into() }.to_json();
-        self.send_message_to_subscribers(&json_string);
+        self.send_action_to_subscribers(Action::Remove { token: token.into() });
         self.views.remove(token);
         Ok(())
     }
