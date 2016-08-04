@@ -428,6 +428,11 @@ button.primary-button {
         width: 24px;
         height: 24px;
       }
+
+      .broken-link {
+          margin-right: 10px;
+          text-decoration: line-through;
+      }
     }
   }
 }

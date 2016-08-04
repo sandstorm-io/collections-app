@@ -243,6 +243,10 @@ class GrainList extends React.Component {
     return false;
   }
 
+  refresh(token) {
+    http("/refresh/" + token, "post");
+  }
+
   render() {
     const searchKeys = this.state.searchString.toLowerCase()
           .split(" ")
@@ -292,7 +296,11 @@ class GrainList extends React.Component {
             <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
             <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
             </td> :
-            <td>{r.grain.title}</td>;
+            <td><span className="broken-link">{r.grain.title}</span>
+            <button className="secondary-button" onClick={this.refresh.bind(this, r.token)}>
+             refresh
+           </button>
+           </td>;
 
       const dateAdded = r.info.ok?
           <td className="click-to-go date-added" onClick={this.offerUiView.bind(this, r.token)}>

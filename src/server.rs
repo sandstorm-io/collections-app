@@ -97,7 +97,7 @@ impl SavedUiViewData {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct ViewInfoData {
     app_title: String,
     grain_icon_url: String,
@@ -582,6 +582,18 @@ impl web_session::Server for WebSession {
             };
 
             self.offer_ui_view(token, title, params, results)
+
+        } else if path.starts_with("refresh/") {
+            let token = path[8..].to_string();
+            match SavedUiViewSet::retrieve_view_info(&self.saved_ui_views, token) {
+                Ok(()) => {
+                    results.get().init_no_content();
+                }
+                Err(e) => {
+                    fill_in_client_error(results, e);
+                }
+            }
+            Promise::ok(())
         } else {
             let mut error = results.get().init_client_error();
             error.set_status_code(web_session::response::ClientErrorCode::NotFound);
