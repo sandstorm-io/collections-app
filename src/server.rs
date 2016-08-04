@@ -135,9 +135,10 @@ impl Action {
                 format!("{{\"viewInfo\":{{\"token\":\"{}\",\"data\":{} }} }}",
                         token, data.to_json())
             }
-            &Action::ViewInfo { ref token, data: Err(_) } => {
-                format!("{{\"viewInfo\":{{\"token\":\"{}\",\"failed\":true }} }}",
-                        token)
+            &Action::ViewInfo { ref token, data: Err(ref e) } => {
+                format!("{{\"viewInfo\":{{\"token\":\"{}\",\"failed\": {} }} }}",
+                        token,
+                        json::ToJson::to_json(&format!("{}", e)))
             }
 
             &Action::CanWrite(b) => {

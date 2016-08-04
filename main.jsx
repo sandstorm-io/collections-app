@@ -235,8 +235,11 @@ class GrainList extends React.Component {
   }
 
   matchesAppOrGrainTitle = function (needle, grain, info) {
+    if (!info || info.err) return false;
     if (grain && grain.title && grain.title.toLowerCase().indexOf(needle) !== -1) return true;
-    if (info && info.appTitle && info.appTitle.toLowerCase().indexOf(needle) !== -1) return true;
+    if (info.ok && info.ok.appTitle && info.ok.appTitle.toLowerCase().indexOf(needle) !== -1) {
+      return true;
+    }
     return false;
   }
 
@@ -273,24 +276,31 @@ class GrainList extends React.Component {
       }
     }
     const grainRows = _.chain(grains).sortBy((r) => r.grain.dateAdded).map((r) => {
-      return (<tr className="grain" key={r.token}>
-        { this.props.canWrite ?
-          <td onClick={this.clickCheckboxContainer.bind(this)}>
-          <input type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
-          onChange={this.selectGrain.bind(this, r.token)}/>
+      const checkbox = this.props.canWrite ?
+           <td onClick={this.clickCheckboxContainer.bind(this)}>
+            <input type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
+                    onChange={this.selectGrain.bind(this, r.token)}/></td>
+        : [];
+      const appIcon = r.info.ok ?
+            <td className="td-app-icon click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+             <img title={r.info.ok.appTitle} src={r.info.ok.grainIconUrl} className="grain-icon">
+             </img>
             </td> :
-            [] }
-          <td className="td-app-icon click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
-              <img title={r.info.appTitle} src={r.info.grainIconUrl} className="grain-icon"></img>
-          </td>
-          <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
-              <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
-          </td>
+           <td className="td-app-icon"></td> ;
+
+      const grainTitle = r.info.ok ?
+            <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+            <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
+            </td> :
+            <td>{r.grain.title}</td>;
+
+      const dateAdded = r.info.ok?
           <td className="click-to-go date-added" onClick={this.offerUiView.bind(this, r.token)}>
               {makeDateString(new Date(parseInt(r.grain.dateAdded)))}
-          </td>
-              {/*<td> {r.grain.addedBy}</td>*/}
-          </tr>);
+          </td> :
+          <td className="date-added">{makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>;
+
+      return <tr className="grain" key={r.token}>{checkbox}{appIcon}{grainTitle}{dateAdded}</tr>;
     }).value();
 
     const bulkActionButtons = [];
@@ -479,11 +489,11 @@ class Main extends React.Component {
         const newGrains = this.state.grains.delete(action.remove.token);
         this.setState({ grains: newGrains });
       } else if (action.viewInfo) {
-        if (action.viewInfo.failed) {
-          // TODO
-        }
-        const newViewInfos = this.state.viewInfos.set(action.viewInfo.token,
-                                                      action.viewInfo.data);
+        const data = action.viewInfo.data ?
+              { ok: action.viewInfo.data } :
+              { err: action.viewInfo.failed };
+
+        const newViewInfos = this.state.viewInfos.set(action.viewInfo.token, data);
         this.setState({ viewInfos: newViewInfos });
       }
     };
