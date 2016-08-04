@@ -234,6 +234,7 @@ impl SavedUiViewSet {
             };
 
             if token.ends_with(".uploading") {
+                // At one point, these temporary files got uploading directly into this directory.
                 try!(::std::fs::remove_file(dir_entry.path()));
             } else {
                 let mut reader = try!(::std::fs::File::open(dir_entry.path()));
@@ -883,8 +884,8 @@ impl ui_view::Server for UiView {
     {
         let mut view_info = results.get();
 
-        // Define a "write" permission, and then define roles "editor" and "viewer" where only "editor"
-        // has the "write" permission. This will allow people to share read-only.
+        // Define a "write" permission, and then define roles "editor" and "viewer" where only
+        // "editor" has the "write" permission. This will allow people to share read-only.
         {
             let perms = view_info.borrow().init_permissions(1);
             let mut write = perms.get(0);
