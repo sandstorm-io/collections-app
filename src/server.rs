@@ -115,7 +115,7 @@ impl ViewInfoData {
 enum Action {
     Insert { token: String, data: SavedUiViewData },
     Remove { token: String },
-    ViewInfo { token: String, data: ViewInfoData },
+    ViewInfo { token: String, data: Result<ViewInfoData, Error> },
     CanWrite(bool),
     UserId(Option<String>),
     Description(String),
@@ -131,10 +131,15 @@ impl Action {
             &Action::Remove { ref token } => {
                 format!("{{\"remove\":{{\"token\":\"{}\"}}}}", token)
             }
-            &Action::ViewInfo { ref token, ref data } => {
+            &Action::ViewInfo { ref token, data: Ok(ref data) } => {
                 format!("{{\"viewInfo\":{{\"token\":\"{}\",\"data\":{} }} }}",
                         token, data.to_json())
             }
+            &Action::ViewInfo { ref token, data: Err(_) } => {
+                format!("{{\"viewInfo\":{{\"token\":\"{}\",\"failed\":true }} }}",
+                        token)
+            }
+
             &Action::CanWrite(b) => {
                 format!("{{\"canWrite\":{}}}", b)
             }
@@ -165,7 +170,7 @@ pub struct SavedUiViewSet {
     /// out Action::Insert messages to each subscriber.
     views: HashMap<String, SavedUiViewData>,
 
-    view_infos: HashMap<String, ViewInfoData>,
+    view_infos: HashMap<String, Result<ViewInfoData, Error>>,
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
     tasks: ::gj::TaskSet<(), Error>,
@@ -287,28 +292,27 @@ impl SavedUiViewSet {
                 let view_info = pry!(response.get());
                 let app_title = pry!(pry!(view_info.get_app_title()).get_default_text()).to_string();
                 let asset = pry!(view_info.get_grain_icon());
-                asset.get_url_request().send().promise.then(move |response| {
-                    let result = pry!(response.get());
-                    let protocol = match pry!(result.get_protocol()) {
+                asset.get_url_request().send().promise.map(move |response| {
+                    let result = try!(response.get());
+                    let protocol = match try!(result.get_protocol()) {
                         static_asset::Protocol::Https => "https".to_string(),
                         static_asset::Protocol::Http => "http".to_string(),
                     };
 
-                    let info = ViewInfoData {
+                    Ok(ViewInfoData {
                         app_title: app_title,
-                        grain_icon_url: format!("{}://{}", protocol, pry!(result.get_host_path())),
-                    };
-
-                    set.borrow_mut().view_infos.insert(token.clone(), info.clone());
-
-                    set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
-                        token: token,
-                        data: info,
-                    });
-
-                    Promise::ok(())
+                        grain_icon_url: format!("{}://{}", protocol, try!(result.get_host_path())),
+                    })
                 })
             })
+        }).map_else(move |result| {
+            set.borrow_mut().view_infos.insert(token.clone(), result.clone());
+            set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
+                token: token,
+                data: result,
+            });
+
+            Ok(())
         });
 
         set_ref.borrow_mut().tasks.add(task);

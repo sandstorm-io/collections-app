@@ -479,6 +479,9 @@ class Main extends React.Component {
         const newGrains = this.state.grains.delete(action.remove.token);
         this.setState({ grains: newGrains });
       } else if (action.viewInfo) {
+        if (action.viewInfo.failed) {
+          // TODO
+        }
         const newViewInfos = this.state.viewInfos.set(action.viewInfo.token,
                                                       action.viewInfo.data);
         this.setState({ viewInfos: newViewInfos });
