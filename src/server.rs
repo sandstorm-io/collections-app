@@ -704,23 +704,34 @@ impl WebSession {
         };
 
         let session_context = self.context.clone();
+        let set = self.saved_ui_views.clone();
         let mut req = self.sandstorm_api.restore_request();
         req.get().set_token(&token);
-        req.send().promise.then(move |response| {
-            let sealed_ui_view: ui_view::Client =
-                pry!(pry!(response.get()).get_cap().get_as_capability());
-            let mut req = session_context.offer_request();
-            req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
-            {
-                use capnp::traits::HasTypeId;
-                let tags = req.get().init_descriptor().init_tags(1);
-                let mut tag = tags.get(0);
-                tag.set_id(ui_view::Client::type_id());
-                let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
-                value.set_title(&title);
-            }
+        req.send().promise.then_else(move |response| match response {
+            Ok(v) => {
+                let sealed_ui_view: ui_view::Client =
+                    pry!(pry!(v.get()).get_cap().get_as_capability());
+                let mut req = session_context.offer_request();
+                req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
+                {
+                    use capnp::traits::HasTypeId;
+                    let tags = req.get().init_descriptor().init_tags(1);
+                    let mut tag = tags.get(0);
+                    tag.set_id(ui_view::Client::type_id());
+                    let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
+                    value.set_title(&title);
+                }
 
-            req.send().promise
+                req.send().promise.map(|_| Ok(()))
+            }
+            Err(e) => {
+                set.borrow_mut().view_infos.insert(text_token.clone(), Err(e.clone()));
+                set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
+                    token: text_token,
+                    data: Err(e),
+                });
+                Promise::ok(())
+            }
         }).then_else(move |r| match r {
             Ok(_) => {
                 results.get().init_no_content();
