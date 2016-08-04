@@ -406,13 +406,14 @@ class Main extends React.Component {
            description: String,
            grains: Immutable.Map,
            viewInfos: Immutable.Map,
-           socketReadyState: String,
+           socketReadyState: Object,
          };
 
   constructor(props) {
     super(props);
     this.state = { grains: Immutable.Map(),
                    viewInfos: Immutable.Map(),
+                   socketReadyState: { initializing: true},
                  };
   }
 
@@ -421,13 +422,17 @@ class Main extends React.Component {
   }
 
   openWebSocket(delayOnFailure) {
-    this.setState({socketReadyState: "connecting" });
+    if (!!this.state.socketReadyState.open) {
+      return;
+    }
+
+    this.setState({socketReadyState: { connecting: true } });
 
     let wsProtocol = window.location.protocol == "http:" ? "ws" : "wss";
     let ws = new WebSocket(wsProtocol + "://" + window.location.host);
 
     ws.onopen = (e) => {
-      this.setState({ socketReadyState: "open" });
+      this.setState({ socketReadyState: { open: true } });
     };
 
     ws.onerror = (e) => {
@@ -437,19 +442,25 @@ class Main extends React.Component {
     ws.onclose = (e) => {
       console.log("websocket closed: ", e);
       let newDelay = 0;
-      if (this.state.socketReadyState !== "open") {
+      if (!this.state.socketReadyState.open) {
         if (delayOnFailure == 0) {
           newDelay = 1000;
         } else {
-          newDelay = delayOnFailure * 2;
+          newDelay = Math.min(delayOnFailure * 2, 60 * 1000); // Don't go over a minute.
         }
         console.log("websocket failed to connect. Retrying in " + delayOnFailure + " milliseconds");
       }
-      this.setState({ socketReadyState: "closed" });
 
-      window.setTimeout(() => {
+      const timeout = window.setTimeout(() => {
         this.openWebSocket(newDelay);
       }, delayOnFailure);
+
+      this.setState({
+        socketReadyState: {
+          tryingAgainLater: { timeout }
+        }
+      });
+
     };
 
     ws.onmessage = (m) => {
@@ -476,13 +487,24 @@ class Main extends React.Component {
 
   }
 
+  retryConnect() {
+    if (this.state.socketReadyState.tryingAgainLater) {
+      window.clearTimeout(this.state.socketReadyState.tryingAgainLater.timeout);
+      this.openWebSocket(1000);
+    }
+  }
+
   render() {
     let maybeSocketWarning = null;
-    if (this.state.socketReadyState === "connecting") {
+    if (!!this.state.socketReadyState.connecting) {
       maybeSocketWarning = <p>WebSocket connecting...</p>;
-    } else if (this.state.socketReadyState === "closed") {
+    } else if (!!this.state.socketReadyState.tryingAgainLater) {
       // TODO display timer for how long until next retry
-      maybeSocketWarning = <p>WebSocket closed! Waiting and then retrying...</p>;
+      maybeSocketWarning = <p>WebSocket closed! Waiting and then retrying...
+        <button className="secondary-button" onClick={this.retryConnect.bind(this)}>
+         retry now
+        </button>
+        </p>;
     }
 
     return <div>
