@@ -266,7 +266,7 @@ class GrainList extends React.Component {
     for (let e of this.props.grains.entries()) {
       const grain = e[1];
       const info = this.props.viewInfos.get(e[0]) || {};
-      if (matchFilter(grain, info)) {
+      if ((info.ok || this.props.canWrite) && matchFilter(grain, info)) {
         if (this.state.selectedGrains.get(e[0])) {
           numShownAndSelected += 1;
         }
