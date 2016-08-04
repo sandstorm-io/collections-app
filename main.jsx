@@ -418,7 +418,7 @@ class Main extends React.Component {
   }
 
   componentDidMount() {
-    this.openWebSocket(0);
+    this.openWebSocket(1000);
   }
 
   openWebSocket(delayOnFailure) {
