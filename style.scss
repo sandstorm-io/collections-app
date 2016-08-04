@@ -429,10 +429,15 @@ button.primary-button {
         height: 24px;
       }
 
+    }
+
+    &.broken-grain {
+      background-color: $grainlist-background-color;
       .broken-link {
-          margin-right: 10px;
-          text-decoration: line-through;
+         margin-right: 10px;
+         text-decoration: line-through;
       }
     }
+
   }
 }

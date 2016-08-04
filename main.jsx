@@ -247,6 +247,10 @@ class GrainList extends React.Component {
     http("/refresh/" + token, "post");
   }
 
+  remove(token){
+    http("/sturdyref/" + token, "delete");
+  }
+
   render() {
     const searchKeys = this.state.searchString.toLowerCase()
           .split(" ")
@@ -296,7 +300,12 @@ class GrainList extends React.Component {
             <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
             <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
             </td> :
-            <td><span className="broken-link">{r.grain.title}</span>
+            <td><span className="broken-link" title={"broken link: " + r.info.err}>
+              {r.grain.title}
+             </span>
+            <button className="secondary-button" onClick={this.remove.bind(this, r.token)}>
+             remove
+           </button>
             <button className="secondary-button" onClick={this.refresh.bind(this, r.token)}>
              refresh
            </button>
@@ -308,7 +317,9 @@ class GrainList extends React.Component {
           </td> :
           <td className="date-added">{makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>;
 
-      return <tr className="grain" key={r.token}>{checkbox}{appIcon}{grainTitle}{dateAdded}</tr>;
+      return <tr className={r.info.ok ? "grain" : "broken-grain"} key={r.token}>
+          {checkbox}{appIcon}{grainTitle}{dateAdded}
+        </tr>;
     }).value();
 
     const bulkActionButtons = [];
@@ -499,7 +510,7 @@ class Main extends React.Component {
       } else if (action.viewInfo) {
         const data = action.viewInfo.data ?
               { ok: action.viewInfo.data } :
-              { err: action.viewInfo.failed };
+              { err: action.viewInfo.failed.split("\n")[0] }; // HACK to drop the stack trace.
 
         const newViewInfos = this.state.viewInfos.set(action.viewInfo.token, data);
         this.setState({ viewInfos: newViewInfos });
