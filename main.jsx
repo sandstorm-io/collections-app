@@ -353,7 +353,8 @@ class GrainList extends React.Component {
          {this.props.canWrite ?
             <td onClick={this.clickCheckboxContainer.bind(this)}
               className="select-all-grains">
-          <input type="checkbox" onChange={this.selectAll.bind(this)}
+          <input type="checkbox" title={numShownAndSelected > 0 ? "unselect all" : "select all"}
+                 onChange={this.selectAll.bind(this)}
                  checked={numShownAndSelected > 0}/>
            </td> : [] }
               <td className="td-app-icon"></td>
