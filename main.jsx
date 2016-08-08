@@ -104,6 +104,12 @@ const EDIT_ICON = <svg version="1.1" viewBox="-4.5 168.5 15 15">
 	  <polyline points="-1.5,181.5 5.7,181.5 5.7,180.7 -1.5,180.7"/>
       </svg>;
 
+const REFRESH_ICON = <svg version="1.1" viewBox="0 0 25 25">
+   <g>
+	<path d="M12.7,20.3c-2,0-4.1-0.8-5.6-2.3c-1.6-1.6-2.3-3.6-2.3-5.6c0-0.8,0.1-1.7,0.4-2.5l1.6,1.4L6.5,6.5 L1.8,7.1l1.8,1.5C3,9.8,2.8,11.1,2.8,12.4c0,2.5,1,5.1,2.9,7c1.9,1.9,4.5,2.9,7,2.9c1.6,0,3.3-0.4,4.8-1.2L16,19.6 C14.9,20.1,13.8,20.3,12.7,20.3z"/>
+	<path d="M21.4,17c0.8-1.4,1.1-3,1.1-4.6c0-2.5-1-5.1-2.9-7c-1.9-1.9-4.5-2.9-7-2.9c-1.9,0-3.8,0.6-5.5,1.6 l1.4,1.4c1.2-0.7,2.6-1.1,4-1.1c2,0,4.1,0.8,5.6,2.3c1.6,1.6,2.3,3.6,2.3,5.6c0,1.1-0.3,2.3-0.7,3.3l-1.7-1.4l0.2,3.8L18.3,18 c0,0,0,0,0,0l0.1,0.1l0.1,0.9l4.7-0.6L21.4,17z"/>
+  </g>
+  </svg>;
 
 class AddGrain extends React.Component {
   props: {};
@@ -294,21 +300,19 @@ class GrainList extends React.Component {
              <img title={r.info.ok.appTitle} src={r.info.ok.grainIconUrl} className="grain-icon">
              </img>
             </td> :
-           <td className="td-app-icon"></td> ;
+        <td className="td-app-icon">
+        <button className="secondary-button" name="refresh" title="retry connection to grain"
+                onClick={this.refresh.bind(this, r.token)}>{REFRESH_ICON}</button>
+        </td> ;
 
       const grainTitle = r.info.ok ?
             <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
             <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
             </td> :
-            <td><span className="broken-link" title={"broken link: " + r.info.err}>
-              {r.grain.title}
+            <td><span className="broken-link" title={"broken: " + r.info.err}>
+             {r.grain.title}</span>
+             <span>(broken)
              </span>
-            <button className="secondary-button" onClick={this.remove.bind(this, r.token)}>
-             remove
-           </button>
-            <button className="secondary-button" onClick={this.refresh.bind(this, r.token)}>
-             refresh
-           </button>
            </td>;
 
       const dateAdded = r.info.ok?

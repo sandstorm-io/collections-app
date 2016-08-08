@@ -437,6 +437,14 @@ button.primary-button {
          margin-right: 10px;
          text-decoration: line-through;
       }
+      button[name=refresh] {
+        width: 24px;
+        height: 24px;
+        padding: 2px;
+        svg {
+
+        }
+      }
     }
 
   }
