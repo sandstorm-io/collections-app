@@ -509,6 +509,15 @@ class Main extends React.Component {
         const newGrains = this.state.grains.set(action.insert.token,
                                                 action.insert.data);
         this.setState({grains: newGrains});
+
+        if (!this.state.viewInfos.get(action.insert.token)) {
+          // HACK: We are likely in an intermediate state between receiving the info
+          // about the grian and receiving its view info. If we don't add an "ok" viewinfo here,
+          // then the UI will briefly display the grain as broken.
+          // Maybe we should combine the `insert` and `viewInfo` messages?
+          const newViewInfos = this.state.viewInfos.set(action.insert.token, { ok: {} });
+          this.setState({ viewInfos: newViewInfos });
+        }
       } else if (action.remove) {
         const newGrains = this.state.grains.delete(action.remove.token);
         this.setState({ grains: newGrains });
