@@ -34,7 +34,7 @@ const pkgdef :Spk.PackageDefinition = (
       ),
 
       website = "https://sandstorm.io",
-      codeUrl = "https://github.com/dwrensha/sandstorm-collections-app",
+      codeUrl = "https://github.com/sandstorm-io/collections-app",
       license = (openSource = mit),
       categories = [productivity],
 
