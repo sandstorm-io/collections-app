@@ -25,33 +25,35 @@ use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
 use rustc_serialize::{base64, hex, json};
 
 use std::collections::hash_map::HashMap;
+use std::collections::hash_set::HashSet;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use collections_capnp::ui_view_metadata;
 use web_socket;
+use identity_map::IdentityMap;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::identity_capnp::{user_info};
 use sandstorm::grain_capnp::{session_context, ui_view, ui_session, sandstorm_api};
-use sandstorm::grain_capnp::{static_asset};
+use sandstorm::util_capnp::{static_asset};
 use sandstorm::web_session_capnp::{web_session};
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
 
 pub struct WebSocketStream {
     id: u64,
-    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
+    saved_ui_views: SavedUiViewSet,
 }
 
 impl Drop for WebSocketStream {
     fn drop(&mut self) {
-        self.saved_ui_views.borrow_mut().subscribers.remove(&self.id);
+        self.saved_ui_views.inner.borrow_mut().subscribers.remove(&self.id);
     }
 }
 
 impl WebSocketStream {
     fn new(id: u64,
-           saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
+           saved_ui_views: SavedUiViewSet)
            -> WebSocketStream
     {
         WebSocketStream {
@@ -111,6 +113,21 @@ impl ViewInfoData {
     }
 }
 
+#[derive(Clone, Debug)]
+struct ProfileData {
+    display_name: String,
+    picture_url: String,
+}
+
+impl ProfileData {
+    fn to_json(&self) -> String {
+        format!(
+            "{{\"pictureUrl\":{}, \"displayName\":{}}}",
+            json::ToJson::to_json(&self.picture_url),
+            json::ToJson::to_json(&self.display_name))
+    }
+}
+
 #[derive(Clone)]
 enum Action {
     Insert { token: String, data: SavedUiViewData },
@@ -119,6 +136,7 @@ enum Action {
     CanWrite(bool),
     UserId(Option<String>),
     Description(String),
+    User { id: String, data: ProfileData },
 }
 
 impl Action {
@@ -150,8 +168,25 @@ impl Action {
             &Action::Description(ref s) => {
                 format!("{{\"description\":{}}}", json::ToJson::to_json(s))
             }
+            &Action::User { ref id, ref data } => {
+                format!(
+                    "{{\"user\":{{\"id\":{}, \"data\":{} }}}}",
+                    json::ToJson::to_json(id), data.to_json())
+            }
         }
     }
+}
+
+fn url_of_static_asset(asset: static_asset::Client) -> Promise<String, Error> {
+    asset.get_url_request().send().promise.map(move |response| {
+        let result = try!(response.get());
+        let protocol = match try!(result.get_protocol()) {
+            static_asset::Protocol::Https => "https".to_string(),
+            static_asset::Protocol::Http => "http".to_string(),
+        };
+
+        Ok(format!("{}://{}", protocol, try!(result.get_host_path())))
+    })
 }
 
 struct Reaper;
@@ -163,7 +198,7 @@ impl ::gj::TaskReaper<(), Error> for Reaper {
     }
 }
 
-pub struct SavedUiViewSet {
+struct SavedUiViewSetInner {
     tmp_dir: ::std::path::PathBuf,
     sturdyref_dir: ::std::path::PathBuf,
 
@@ -177,13 +212,28 @@ pub struct SavedUiViewSet {
     tasks: ::gj::TaskSet<(), Error>,
     description: String,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    identity_map: ::identity_map::IdentityMap,
+
+}
+
+impl SavedUiViewSetInner {
+    fn get_saved_data<'a>(&'a self, token: &'a String) -> Option<&'a SavedUiViewData> {
+        self.views.get(token)
+    }
+}
+
+#[derive(Clone)]
+pub struct SavedUiViewSet {
+    inner: Rc<RefCell<SavedUiViewSetInner>>,
 }
 
 impl SavedUiViewSet {
     pub fn new<P1, P2>(tmp_dir: P1,
                        sturdyref_dir: P2,
-                       sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>)
-                  -> ::capnp::Result<Rc<RefCell<SavedUiViewSet>>>
+                       sandstorm_api: &sandstorm_api::Client<::capnp::any_pointer::Owned>,
+                       identity_map: ::identity_map::IdentityMap,
+    )
+                  -> ::capnp::Result<SavedUiViewSet>
         where P1: AsRef<::std::path::Path>,
               P2: AsRef<::std::path::Path>
     {
@@ -206,17 +256,20 @@ impl SavedUiViewSet {
             }
         };
 
-        let result = Rc::new(RefCell::new(SavedUiViewSet {
-            tmp_dir: tmp_dir.as_ref().to_path_buf(),
-            sturdyref_dir: sturdyref_dir.as_ref().to_path_buf(),
-            views: HashMap::new(),
-            view_infos: HashMap::new(),
-            next_id: 0,
-            subscribers: HashMap::new(),
-            tasks: ::gj::TaskSet::new(Box::new(Reaper)),
-            description: description,
-            sandstorm_api: sandstorm_api,
-        }));
+        let result = SavedUiViewSet {
+            inner: Rc::new(RefCell::new(SavedUiViewSetInner {
+                tmp_dir: tmp_dir.as_ref().to_path_buf(),
+                sturdyref_dir: sturdyref_dir.as_ref().to_path_buf(),
+                views: HashMap::new(),
+                view_infos: HashMap::new(),
+                next_id: 0,
+                subscribers: HashMap::new(),
+                tasks: ::gj::TaskSet::new(Box::new(Reaper)),
+                description: description,
+                sandstorm_api: sandstorm_api.clone(),
+                identity_map: identity_map,
+            })),
+        };
 
         // create sturdyref directory if it does not yet exist
         try!(::std::fs::create_dir_all(&sturdyref_dir));
@@ -260,31 +313,27 @@ impl SavedUiViewSet {
                     added_by: added_by,
                 };
 
-                result.borrow_mut().views.insert(token.clone(), entry);
+                result.inner.borrow_mut().views.insert(token.clone(), entry);
 
-                try!(SavedUiViewSet::retrieve_view_info(&result, token));
+                try!(result.retrieve_view_info(token));
             }
         }
 
         Ok(result)
     }
 
-    fn get_saved_data<'a>(&'a self, token: &'a String) -> Option<&'a SavedUiViewData> {
-        self.views.get(token)
-    }
-
-    fn retrieve_view_info(set_ref: &Rc<RefCell<SavedUiViewSet>>,
+    fn retrieve_view_info(&self,
                           token: String) -> ::capnp::Result<()> {
         // SandstormApi.restore, then call getViewInfo,
         // then call get_url() on the grain static asset.
 
-        let set = set_ref.clone();
+        let mut self1 = self.clone();
         let binary_token = match base64::FromBase64::from_base64(&token[..]) {
             Ok(b) => b,
             Err(e) => return Err(Error::failed(format!("{}", e))),
         };
 
-        let mut req = set.borrow().sandstorm_api.restore_request();
+        let mut req = self.inner.borrow().sandstorm_api.restore_request();
         req.get().set_token(&binary_token);
         let task = req.send().promise.then(move |response| {
             let view: ui_view::Client =
@@ -292,23 +341,16 @@ impl SavedUiViewSet {
             view.get_view_info_request().send().promise.then(move |response| {
                 let view_info = pry!(response.get());
                 let app_title = pry!(pry!(view_info.get_app_title()).get_default_text()).to_string();
-                let asset = pry!(view_info.get_grain_icon());
-                asset.get_url_request().send().promise.map(move |response| {
-                    let result = try!(response.get());
-                    let protocol = match try!(result.get_protocol()) {
-                        static_asset::Protocol::Https => "https".to_string(),
-                        static_asset::Protocol::Http => "http".to_string(),
-                    };
-
+                url_of_static_asset(pry!(view_info.get_grain_icon())).map(move |url| {
                     Ok(ViewInfoData {
                         app_title: app_title,
-                        grain_icon_url: format!("{}://{}", protocol, try!(result.get_host_path())),
+                        grain_icon_url: url,
                     })
                 })
             })
         }).map_else(move |result| {
-            set.borrow_mut().view_infos.insert(token.clone(), result.clone());
-            set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
+            self1.inner.borrow_mut().view_infos.insert(token.clone(), result.clone());
+            self1.send_action_to_subscribers(Action::ViewInfo {
                 token: token,
                 data: result,
             });
@@ -316,8 +358,21 @@ impl SavedUiViewSet {
             Ok(())
         });
 
-        set_ref.borrow_mut().tasks.add(task);
+        self.inner.borrow_mut().tasks.add(task);
         Ok(())
+    }
+
+    fn get_user_profile(&mut self,
+                        identity_id: &str) -> Promise<ProfileData, Error> {
+        self.inner.borrow_mut().identity_map.get_by_text(identity_id).then(move |identity| {
+            identity.get_profile_request().send().promise
+        }).then(move |response| {
+            let profile = pry!(pry!(response.get()).get_profile());
+            let display_name = pry!(pry!(profile.get_display_name()).get_default_text()).to_string();
+            url_of_static_asset(pry!(profile.get_picture())).map(move |url| {
+                Ok(ProfileData { display_name: display_name, picture_url: url })
+            })
+        })
     }
 
     fn update_description(&mut self, description: &[u8]) -> ::capnp::Result<()> {
@@ -332,7 +387,7 @@ impl SavedUiViewSet {
         try!(try!(::std::fs::File::create(&temp_path)).write_all(description));
         try!(::std::fs::rename(temp_path, "/var/description"));
 
-        self.description = desc_string.clone();
+        self.inner.borrow_mut().description = desc_string.clone();
         self.send_action_to_subscribers(Action::Description(desc_string));
         Ok(())
     }
@@ -346,11 +401,11 @@ impl SavedUiViewSet {
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
-        token_path.push(self.sturdyref_dir.clone());
+        token_path.push(self.inner.borrow().sturdyref_dir.clone());
         token_path.push(token.clone());
 
         let mut temp_path = ::std::path::PathBuf::new();
-        temp_path.push(self.tmp_dir.clone());
+        temp_path.push(self.inner.borrow().tmp_dir.clone());
         temp_path.push(format!("{}.uploading", token));
 
         let mut writer = try!(::std::fs::File::create(&temp_path));
@@ -370,6 +425,19 @@ impl SavedUiViewSet {
         try!(::std::fs::rename(temp_path, token_path));
         try!(writer.sync_all());
 
+        if !self.inner.borrow().subscribers.is_empty() {
+            if let Some(ref id) = added_by {
+                let mut self1 = self.clone();
+                let identity_id: String = id.to_string();
+                let task = self.get_user_profile(&identity_id).map(move |profile_data| {
+                    self1.send_action_to_subscribers(
+                        Action::User { id: identity_id, data: profile_data });
+                    Ok(())
+                });
+                self.inner.borrow_mut().tasks.add(task);
+            }
+        }
+
         let entry = SavedUiViewData {
             title: title,
             date_added: date_added,
@@ -380,22 +448,24 @@ impl SavedUiViewSet {
             token: token.clone(),
             data: entry.clone(),
         });
-        self.views.insert(token, entry);
+        self.inner.borrow_mut().views.insert(token, entry);
 
         Ok(())
     }
 
     fn send_action_to_subscribers(&mut self, action: Action) {
         let json_string = action.to_json();
-        for (_, sub) in &self.subscribers {
+        let &mut SavedUiViewSetInner { ref subscribers, ref mut tasks, ..} =
+            &mut *self.inner.borrow_mut();
+        for (_, sub) in &*subscribers {
             let mut req = sub.send_bytes_request();
             web_socket::encode_text_message(req.get(), &json_string);
-            self.tasks.add(req.send().promise.map(|_| Ok(())));
+            tasks.add(req.send().promise.map(|_| Ok(())));
         }
     }
 
     fn remove(&mut self, token: &str) -> Result<(), Error> {
-        let mut path = self.sturdyref_dir.clone();
+        let mut path = self.inner.borrow().sturdyref_dir.clone();
         path.push(token);
         if let Err(e) = ::std::fs::remove_file(path) {
             if e.kind() != ::std::io::ErrorKind::NotFound {
@@ -404,11 +474,11 @@ impl SavedUiViewSet {
         }
 
         self.send_action_to_subscribers(Action::Remove { token: token.into() });
-        self.views.remove(token);
+        self.inner.borrow_mut().views.remove(token);
         Ok(())
     }
 
-    fn new_subscribed_websocket(set: &Rc<RefCell<SavedUiViewSet>>,
+    fn new_subscribed_websocket(&mut self,
                                 client_stream: web_socket_stream::Client,
                                 can_write: bool,
                                 user_id: Option<String>,
@@ -425,19 +495,25 @@ impl SavedUiViewSet {
             task.then(|_| promise)
         }
 
-        let id = set.borrow().next_id;
-        set.borrow_mut().next_id = id + 1;
+        let id = self.inner.borrow().next_id;
+        self.inner.borrow_mut().next_id = id + 1;
 
-        set.borrow_mut().subscribers.insert(id, client_stream.clone());
+        self.inner.borrow_mut().subscribers.insert(id, client_stream.clone());
 
         let mut task = Promise::ok(());
 
         task = send_action(task, &client_stream, Action::CanWrite(can_write));
         task = send_action(task, &client_stream, Action::UserId(user_id));
         task = send_action(task, &client_stream,
-                           Action::Description(set.borrow().description.clone()));
+                           Action::Description(self.inner.borrow().description.clone()));
 
-        for (t, v) in &set.borrow().views {
+        let mut added_by_identities: HashSet<String> = HashSet::new();
+
+        for (t, v) in &self.inner.borrow().views {
+            if let &Some(ref id) = &v.added_by {
+                added_by_identities.insert(id.clone());
+            }
+
             task = send_action(
                 task, &client_stream,
                 Action::Insert {
@@ -447,7 +523,7 @@ impl SavedUiViewSet {
             );
         }
 
-        for (t, vi) in &set.borrow().view_infos {
+        for (t, vi) in &self.inner.borrow().view_infos {
             task = send_action(
                 task, &client_stream,
                 Action::ViewInfo {
@@ -457,11 +533,27 @@ impl SavedUiViewSet {
             );
         }
 
-        set.borrow_mut().tasks.add(task);
+        self.inner.borrow_mut().tasks.add(task);
+
+        for ref text_id in &added_by_identities {
+            let id = text_id.to_string();
+            let client_stream1 = client_stream.clone();
+
+            let task = self.get_user_profile(text_id).then(move |profile_data| {
+                let action = Action::User { id: id, data: profile_data };
+                let json_string = action.to_json();
+                let mut req = client_stream1.send_bytes_request();
+                web_socket::encode_text_message(req.get(), &json_string);
+                req.send().promise.map(|_| Ok(()))
+            });
+
+            self.inner.borrow_mut().tasks.add(task);
+        }
+
 
         web_socket_stream::ToClient::new(
             web_socket::Adapter::new(
-                WebSocketStream::new(id, set.clone()),
+                WebSocketStream::new(id, self.clone()),
                 client_stream,
                 timer.clone())).from_server::<::capnp_rpc::Server>()
     }
@@ -476,7 +568,7 @@ pub struct WebSession {
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     context: session_context::Client,
-    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
+    saved_ui_views: SavedUiViewSet,
     identity_id: Option<String>,
 }
 
@@ -486,7 +578,7 @@ impl WebSession {
                context: session_context::Client,
                _params: web_session::params::Reader,
                sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-               saved_ui_views: Rc<RefCell<SavedUiViewSet>>)
+               saved_ui_views: SavedUiViewSet)
                -> ::capnp::Result<WebSession>
     {
         // Permission #0 is "write". Check if bit 0 in the PermissionSet is set.
@@ -572,7 +664,7 @@ impl web_session::Server for WebSession {
             self.receive_request_token(path[6..].to_string(), params, results)
         } else if path.starts_with("offer/") {
             let token = path[6..].to_string();
-            let title = match self.saved_ui_views.borrow().get_saved_data(&token) {
+            let title = match self.saved_ui_views.inner.borrow().get_saved_data(&token) {
                 None => {
                     let mut error = results.get().init_client_error();
                     error.set_status_code(web_session::response::ClientErrorCode::NotFound);
@@ -618,7 +710,7 @@ impl web_session::Server for WebSession {
             Promise::ok(())
         } else if path == "description" {
             let content = pry!(pry!(params.get_content()).get_content());
-            pry!(self.saved_ui_views.borrow_mut().update_description(content));
+            pry!(self.saved_ui_views.update_description(content));
             let mut req = self.context.activity_request();
             req.get().init_event().set_type(EDIT_DESCRIPTION_ACTIVITY_INDEX);
             req.send().promise.then(move |_| {
@@ -660,12 +752,12 @@ impl web_session::Server for WebSession {
                 }
             };
 
-            let saved_ui_views = self.saved_ui_views.clone();
+            let mut saved_ui_views = self.saved_ui_views.clone();
             let context = self.context.clone();
             let mut req = self.sandstorm_api.drop_request();
             req.get().set_token(&binary_token);
             req.send().promise.then(move |_| {
-                pry!(saved_ui_views.borrow_mut().remove(&token_string));
+                pry!(saved_ui_views.remove(&token_string));
                 let mut req = context.activity_request();
                 req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
                 req.send().promise.then(move |_| {
@@ -684,8 +776,7 @@ impl web_session::Server for WebSession {
         let client_stream = pry!(pry!(params.get()).get_client_stream());
 
         results.get().set_server_stream(
-            SavedUiViewSet::new_subscribed_websocket(
-                &self.saved_ui_views,
+            self.saved_ui_views.new_subscribed_websocket(
                 client_stream,
                 self.can_write,
                 self.identity_id.clone(),
@@ -715,7 +806,7 @@ impl WebSession {
         };
 
         let session_context = self.context.clone();
-        let set = self.saved_ui_views.clone();
+        let mut set = self.saved_ui_views.clone();
         let mut req = self.sandstorm_api.restore_request();
         req.get().set_token(&token);
         req.send().promise.then_else(move |response| match response {
@@ -736,8 +827,8 @@ impl WebSession {
                 req.send().promise.map(|_| Ok(()))
             }
             Err(e) => {
-                set.borrow_mut().view_infos.insert(text_token.clone(), Err(e.clone()));
-                set.borrow_mut().send_action_to_subscribers(Action::ViewInfo {
+                set.inner.borrow_mut().view_infos.insert(text_token.clone(), Err(e.clone()));
+                set.send_action_to_subscribers(Action::ViewInfo {
                     token: text_token,
                     data: Err(e),
                 });
@@ -797,7 +888,7 @@ impl WebSession {
         let mut req = self.context.claim_request_request();
         let sandstorm_api = self.sandstorm_api.clone();
         req.get().set_request_token(&token[..]);
-        let saved_ui_views = self.saved_ui_views.clone();
+        let mut saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
 
         let do_stuff = req.send().promise.then(move |response| {
@@ -813,7 +904,7 @@ impl WebSession {
                 let binary_token = try!(try!(response.get()).get_token());
                 let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
 
-                try!(saved_ui_views.borrow_mut().insert(token.clone(), grain_title, identity_id));
+                try!(saved_ui_views.insert(token.clone(), grain_title, identity_id));
 
                 try!(SavedUiViewSet::retrieve_view_info(&saved_ui_views, token));
                 Ok(())
@@ -887,13 +978,14 @@ impl WebSession {
 pub struct UiView {
     timer: ::gjio::Timer,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-    saved_ui_views: Rc<RefCell<SavedUiViewSet>>,
+    saved_ui_views: SavedUiViewSet,
 }
 
 impl UiView {
     fn new(timer: ::gjio::Timer,
            client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-           saved_ui_views: Rc<RefCell<SavedUiViewSet>>) -> UiView
+           saved_ui_views: SavedUiViewSet)
+           -> UiView
     {
         UiView {
             timer: timer,
@@ -972,9 +1064,11 @@ impl ui_view::Server for UiView {
             return Promise::err(Error::failed("unsupported session type".to_string()));
         }
 
+        let user_info = pry!(params.get_user_info());
+
         let session = pry!(WebSession::new(
             self.timer.clone(),
-            pry!(params.get_user_info()),
+            user_info.clone(),
             pry!(params.get_context()),
             pry!(params.get_session_params().get_as()),
             self.sandstorm_api.clone(),
@@ -984,6 +1078,14 @@ impl ui_view::Server for UiView {
 
         // We need to do this silly dance to upcast.
         results.get().set_session(ui_session::Client { client : client.client});
+
+        if user_info.has_identity_id() {
+            let identity = pry!(user_info.get_identity());
+
+            // TODO(cleanup)
+            pry!(self.saved_ui_views.inner.borrow_mut().identity_map.put(pry!(user_info.get_identity_id()), identity));
+        }
+
         Promise::ok(())
     }
 }
@@ -999,9 +1101,12 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         let (p, f) = Promise::and_fulfiller();
         let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
             ::capnp_rpc::new_promise_client(p);
+
+        let identity_map = try!(IdentityMap::new("/var/identities", "/var/trash", &sandstorm_api));
         let saved_uiviews = try!(SavedUiViewSet::new("/var/tmp",
                                                      "/var/sturdyrefs",
-                                                     sandstorm_api.clone()));
+                                                     &sandstorm_api,
+                                                     identity_map));
 
 
         let uiview = UiView::new(

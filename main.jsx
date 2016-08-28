@@ -130,8 +130,7 @@ class AddGrain extends React.Component {
       <td className="install-icon">
        {INSTALL_ICON}
       </td>
-      <td><button>Add grain...</button></td>
-      <td/>
+      <td colSpan="3"><button>Add grain...</button></td>
       </tr>;
   }
 }
@@ -163,6 +162,7 @@ function makeDateString(date) {
 class GrainList extends React.Component {
   props: { grains: Immutable.Map,
            viewInfos: Immutable.Map,
+           users: Immutable.Map,
            canWrite: bool,
            userId: String,
          };
@@ -273,7 +273,6 @@ class GrainList extends React.Component {
       }
     };
 
-
     let numShownAndSelected = 0;
     this._currentlyRendered = {};
     const grains = [];
@@ -306,7 +305,7 @@ class GrainList extends React.Component {
         </td> ;
 
       const grainTitle = r.info.ok ?
-            <td className="click-to-go" onClick={this.offerUiView.bind(this, r.token)}>
+            <td className="click-to-go grain-title" onClick={this.offerUiView.bind(this, r.token)}>
             <button onClick={(e) => {e.preventDefault();} }>{r.grain.title}</button>
             </td> :
             <td><span className="broken-link" title={"broken: " + r.info.err}>
@@ -321,8 +320,19 @@ class GrainList extends React.Component {
           </td> :
           <td className="date-added">{makeDateString(new Date(parseInt(r.grain.dateAdded)))}</td>;
 
+
+      const addedByUser = (r.grain.addedBy && this.props.users.get(r.grain.addedBy)) || {};
+
+      const addedBy = r.info.ok?
+            <td className="click-to-go added-by" onClick={this.offerUiView.bind(this, r.token)}>
+            <img title={addedByUser.displayName} src={addedByUser.pictureUrl}
+                 className="user-profile-pic">
+            </img>
+            </td> :
+            <td className="added-by"></td>;
+
       return <tr className={r.info.ok ? "grain" : "broken-grain"} key={r.token}>
-          {checkbox}{appIcon}{grainTitle}{dateAdded}
+          {checkbox}{appIcon}{grainTitle}{addedBy}{dateAdded}
         </tr>;
     }).value();
 
@@ -359,8 +369,8 @@ class GrainList extends React.Component {
            </td> : [] }
               <td className="td-app-icon"></td>
               <td className="grain-name">Name</td>
+              <td className="added-by">Added by</td>
               <td className="date-added">Date added</td>
-      {/*<td className="added-by">Added by</td>*/}
             </tr>
           </thead>
       <tbody>
@@ -440,6 +450,7 @@ class Main extends React.Component {
            description: String,
            grains: Immutable.Map,
            viewInfos: Immutable.Map,
+           users: Immutable.Map,
            socketReadyState: Object,
          };
 
@@ -447,7 +458,8 @@ class Main extends React.Component {
     super(props);
     this.state = { grains: Immutable.Map(),
                    viewInfos: Immutable.Map(),
-                   socketReadyState: { initializing: true},
+                   users: Immutable.Map(),
+                   socketReadyState: { initializing: true },
                  };
   }
 
@@ -528,6 +540,9 @@ class Main extends React.Component {
 
         const newViewInfos = this.state.viewInfos.set(action.viewInfo.token, data);
         this.setState({ viewInfos: newViewInfos });
+      } else if (action.user) {
+        const newUsers = this.state.users.set(action.user.id, action.user.data);
+        this.setState({ users: newUsers });
       }
     };
 
@@ -558,6 +573,7 @@ class Main extends React.Component {
       <Description canWrite={this.state.canWrite} description={this.state.description}/>
       <hr/>
       <GrainList grains={this.state.grains} viewInfos={this.state.viewInfos}
+                 users={this.state.users}
                  canWrite={this.state.canWrite} userId={this.state.userId} />
       </div>;
   }

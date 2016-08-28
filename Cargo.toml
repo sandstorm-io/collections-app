@@ -18,4 +18,6 @@ gjio = "0.1"
 capnp = "0.7"
 capnp-rpc = "0.7"
 rustc-serialize = "0.3.19"
-sandstorm = "0.0.4"
+url = "1.2"
+sandstorm = "0.0.5"
+

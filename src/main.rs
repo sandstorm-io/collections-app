@@ -25,11 +25,13 @@ extern crate capnp;
 extern crate capnp_rpc;
 extern crate rustc_serialize;
 extern crate sandstorm;
+extern crate url;
 
 pub mod collections_capnp {
   include!(concat!(env!("OUT_DIR"), "/collections_capnp.rs"));
 }
 
+pub mod identity_map;
 pub mod web_socket;
 pub mod server;
 
