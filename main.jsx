@@ -325,11 +325,11 @@ class GrainList extends React.Component {
 
       const addedBy = r.info.ok?
             <td className="click-to-go added-by" onClick={this.offerUiView.bind(this, r.token)}>
-            <img title={addedByUser.displayName} src={addedByUser.pictureUrl}
+            <span><img title={addedByUser.displayName} src={addedByUser.pictureUrl}
                  className="user-profile-pic">
-            </img>
+            </img></span>
             </td> :
-            <td className="added-by"></td>;
+            <td className="added-by"><span></span></td>;
 
       return <tr className={r.info.ok ? "grain" : "broken-grain"} key={r.token}>
           {checkbox}{appIcon}{grainTitle}{addedBy}{dateAdded}

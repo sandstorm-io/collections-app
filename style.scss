@@ -359,18 +359,17 @@ button.primary-button {
     border-left: 1px solid #fff;
     border-right: 1px solid #fff;
     >td {
+      height: 31px;
       &.grain-title {
           width: 100%;
       }
       &.td-app-icon {
-        height: 31px;
         display: flex;
         align-items: center;
         justify-content: center;
         width: 64px;
       }
-      &.added-by {
-        height: 31px;
+      &.added-by>span{
         display: flex;
         align-items: center;
         justify-content: center;
@@ -428,7 +427,7 @@ button.primary-button {
         height: 24px;
       }
 
-      td>img.user-profile-pic {
+      td>span>img.user-profile-pic {
         max-width: 24px;
         max-height: 24px;
       }
