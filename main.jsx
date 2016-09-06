@@ -82,8 +82,11 @@ function doRequest(serializedPowerboxDescriptor) {
     if (response.canceled) {
       console.log("powerbox request was canceled");
     } else {
-      return http("/token/" + response.token, "post", response.descriptor).then((response) => {
-      });
+      if (response.token !== encodeURIComponent(response.token)) {
+        throw new Error("Parent frame returned malformed token: " + response.token);
+      }
+
+      return http("/token/" + response.token, "post", response.descriptor);
     }
   });
 }
