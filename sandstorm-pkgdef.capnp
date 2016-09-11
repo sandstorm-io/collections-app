@@ -7,8 +7,8 @@ const pkgdef :Spk.PackageDefinition = (
 
   manifest = (
     appTitle = (defaultText = "Collections"),
-    appVersion = 5,  # Increment this for every release.
-    appMarketingVersion = (defaultText = "1.1.0"),
+    appVersion = 6,  # Increment this for every release.
+    appMarketingVersion = (defaultText = "1.1.1"),
 
     actions = [
       (
