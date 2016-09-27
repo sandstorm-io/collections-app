@@ -1034,17 +1034,17 @@ impl ui_view::Server for UiView {
             {
                 let mut added = event_types.borrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
                 added.set_name("add");
-                added.borrow().init_verb_phrase().set_default_text("grain added");
+                added.borrow().init_verb_phrase().set_default_text("added grain");
             }
             {
                 let mut removed = event_types.borrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
                 removed.set_name("remove");
-                removed.borrow().init_verb_phrase().set_default_text("grain removed");
+                removed.borrow().init_verb_phrase().set_default_text("removed grain");
             }
             {
                 let mut removed = event_types.borrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
                 removed.set_name("description");
-                removed.borrow().init_verb_phrase().set_default_text("description edited");
+                removed.borrow().init_verb_phrase().set_default_text("edited description");
             }
         }
 
