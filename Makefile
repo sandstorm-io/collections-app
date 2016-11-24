@@ -6,7 +6,7 @@ collections.spk: $(SPK_DEPS)
 	spk pack collections.spk
 
 clean:
-	rm -rf spk tmp bin lib feature-key-vendor.spk
+	rm -rf spk tmp bin lib collections.spk
 
 dev-deps: $(SPK_DEPS)
 
