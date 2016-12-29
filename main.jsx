@@ -291,7 +291,7 @@ class GrainList extends React.Component {
         grains.push({token: e[0], grain, info });
       }
     }
-    const grainRows = _.chain(grains).sortBy((r) => r.grain.dateAdded).map((r) => {
+    const grainRows = _.chain(grains).sortBy((r) => r.grain.dateAdded).reverse().map((r) => {
       const checkbox = this.props.canWrite ?
            <td onClick={this.clickCheckboxContainer.bind(this)}>
             <input type="checkbox" checked={!!this.state.selectedGrains.get(r.token)}
