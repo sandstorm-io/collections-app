@@ -19,8 +19,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-use gj::{Promise, TaskSet};
+use capnp::capability::Promise;
 use capnp::Error;
+use futures::Future;
 use url::percent_encoding;
 use rustc_serialize::{hex};
 use std::cell::RefCell;
@@ -49,7 +50,7 @@ fn read_sturdyref_symlink(pointed_to: ::std::path::PathBuf) -> Result<Vec<u8>, E
 
 struct Reaper;
 
-impl ::gj::TaskReaper<(), Error> for Reaper {
+impl ::multipoll::Finisher<(), Error> for Reaper {
     fn task_failed(&mut self, error: Error) {
         println!("IdentityMap task failed: {}", error);
     }
@@ -59,7 +60,7 @@ struct IdentityMapInner {
     directory: ::std::path::PathBuf,
     trash_directory: ::std::path::PathBuf,
     api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-    tasks: TaskSet<(), Error>,
+    tasks: ::multipoll::PollerHandle<(), Error>,
 }
 
 impl IdentityMapInner {
@@ -75,9 +76,9 @@ impl IdentityMapInner {
         let mut req = inner.borrow().api.restore_request();
         req.get().set_token(&sturdyref[..]);
 
-        req.send().promise.map(move |response| {
+        Promise::from_future(req.send().promise.and_then(move |response| {
             try!(response.get()).get_cap().get_as_capability()
-        })
+        }))
     }
 
    fn save_to_disk(inner: &Rc<RefCell<IdentityMapInner>>,
@@ -90,7 +91,7 @@ impl IdentityMapInner {
        symlink.push(&truncated_text_id);
 
        let inner1 = inner.clone();
-       inner.borrow_mut().tasks.add(req.send().promise.map(move |result| {
+       inner.borrow_mut().tasks.add(req.send().promise.and_then(move |result| {
            // We save the token as a symlink, which ext4 can store (up to 60 bytes)
            // directly in the inode, avoiding the need to allocate a block.
            //
@@ -127,7 +128,7 @@ impl IdentityMapInner {
                 let mut req = inner.borrow().api.drop_request();
                 let sturdyref = try!(read_sturdyref_symlink(pointed_to));
                 req.get().set_token(&sturdyref[..]);
-                inner.borrow_mut().tasks.add(req.send().promise.map(move |_| {
+                inner.borrow_mut().tasks.add(req.send().promise.and_then(move |_| {
                     try!(::std::fs::remove_file(trash_file));
                     // TODO fsync?
                     Ok(())
@@ -149,7 +150,8 @@ pub struct IdentityMap {
 impl IdentityMap {
     pub fn new<P, Q>(directory: P,
                      trash_directory: Q,
-                     api: &sandstorm_api::Client<::capnp::any_pointer::Owned>)
+                     api: &sandstorm_api::Client<::capnp::any_pointer::Owned>,
+                     handle: &::tokio_core::reactor::Handle)
                      -> Result<IdentityMap, Error>
         where P: AsRef<::std::path::Path>,
               Q: AsRef<::std::path::Path>,
@@ -158,12 +160,15 @@ impl IdentityMap {
         try!(::std::fs::create_dir_all(&directory));
         try!(::std::fs::create_dir_all(&trash_directory));
 
+        let (tx, poller) = ::multipoll::Poller::new(Box::new(Reaper));
+        handle.spawn(poller.map_err(|_|()));
+
         Ok(IdentityMap {
             inner: Rc::new(RefCell::new(IdentityMapInner {
                 directory: directory.as_ref().to_path_buf(),
                 trash_directory: trash_directory.as_ref().to_path_buf(),
                 api: api.clone(),
-                tasks: TaskSet::new(Box::new(Reaper)),
+                tasks: tx,
             })),
         })
     }
@@ -203,7 +208,7 @@ impl IdentityMap {
                     }
 
                     e
-                }).map(|_| Ok(())));
+                }).map(|_| ()));
 
                 Ok(())
             }

@@ -19,11 +19,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-use gj::{Promise};
+use capnp::capability::Promise;
 use capnp::Error;
 use std::cell::Cell;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
+use futures::{Future, Poll, Async};
 
 #[repr(u8)]
 pub enum OpCode {
@@ -72,6 +73,44 @@ pub fn encode_message(mut params: web_socket_stream::send_bytes_params::Builder,
     params.set_message(&bytes[..]);
 }
 
+struct Loop<F, S, T, E>
+    where F: Fn(S) -> T,
+          T: Future<Item=(S, bool), Error=E>
+{
+    f: F,
+    in_progress: T,
+}
+
+fn run_loop<F, S, T, E>(initial_state: S, f: F) -> Loop<F, S, T, E>
+    where F: Fn(S) -> T,
+          T: Future<Item=(S, bool), Error=E>,
+{
+    let in_progress = f(initial_state);
+    Loop {
+        f: f,
+        in_progress: in_progress,
+    }
+}
+
+impl <F, S, T, E> Future for Loop<F, S, T, E>
+    where F: Fn(S) -> T,
+          T: Future<Item=(S, bool), Error=E>
+{
+    type Item = S;
+    type Error = E;
+
+    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
+        loop {
+            let (s, more) = try_ready!(self.in_progress.poll());
+            if more {
+                self.in_progress = (self.f)(s);
+            } else {
+                return Ok(Async::Ready(s))
+            }
+        }
+    }
+}
+
 pub enum Message {
   Text(String),
   Data(Vec<u8>),
@@ -82,22 +121,27 @@ pub trait MessageHandler {
 }
 
 fn do_ping_pong(client_stream: web_socket_stream::Client,
-                timer: ::gjio::Timer,
+                handle: ::tokio_core::reactor::Handle,
                 awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
 {
-    let mut req = client_stream.send_bytes_request();
-    req.get().set_message(&[0x89, 0]); // PING
-    let promise = req.send().promise;
-    awaiting_pong.set(true);
-    promise.then(move|_| {
-        timer.after_delay(::std::time::Duration::new(10, 0)).lift().then(move |_| {
-            if awaiting_pong.get() {
-                Promise::err(Error::failed("pong not received within 10 seconds".into()))
-            } else {
-                do_ping_pong(client_stream, timer, awaiting_pong)
-            }
+    Promise::from_future(run_loop((client_stream, handle, awaiting_pong), move |(client_stream, handle, awaiting_pong)| {
+        let mut req = client_stream.send_bytes_request();
+        req.get().set_message(&[0x89, 0]); // PING
+        let promise = req.send().promise;
+        awaiting_pong.set(true);
+        promise.then(move |_| {
+            let timeout = pry!(::tokio_core::reactor::Timeout::new(
+                ::std::time::Duration::new(10, 0),
+                &handle));
+            Promise::from_future(timeout.map_err(Into::into).and_then(move |_| {
+                if awaiting_pong.get() {
+                    Err(Error::failed("pong not received within 10 seconds".into()))
+                } else {
+                    Ok(((client_stream, handle, awaiting_pong), true))
+                }
+            }))
         })
-    })
+    }).map(|_| ()))
 }
 
 enum PreviousFrames {
@@ -269,20 +313,21 @@ pub struct Adapter<T> where T: MessageHandler {
 impl <T> Adapter<T> where T: MessageHandler {
     pub fn new(handler: T,
                client_stream: web_socket_stream::Client,
-               timer: ::gjio::Timer)
+               reactor_handle: ::tokio_core::reactor::Handle,
+               mut task_handle: ::multipoll::PollerHandle<(), Error>)
                -> Adapter<T> {
         let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = do_ping_pong(
+        let ping_pong_promise = Promise::from_future(task_handle.eagerly_evaluate(do_ping_pong(
             client_stream.clone(),
-            timer,
+            reactor_handle,
             awaiting.clone()
-        ).map_else(|r| match r {
+        ).then(|r| match r {
             Ok(_) => Ok(()),
             Err(e) => {
                 println!("error while pinging client: {}", e);
                 Ok(())
             }
-        }).eagerly_evaluate();
+        })).map(|_| ()).map_err(|e| e.into()));
 
         Adapter {
             handler: Some(handler),
@@ -360,7 +405,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
 
                             if fin {
                                 let promise = self.process_message();
-                                result_promise = result_promise.then(|_| promise);
+                                result_promise =
+                                    Promise::from_future(result_promise.and_then(|_| promise));
                             }
                         }
                         0x1 => { // UTF-8 PAYLOAD
@@ -369,7 +415,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
 
                             if fin {
                                 let promise = self.process_message();
-                                result_promise = result_promise.then(|_| promise);
+                                result_promise =
+                                    Promise::from_future(result_promise.and_then(|_| promise));
                             }
                         }
                         0x2 => { // BINARY PAYLOAD
@@ -377,7 +424,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
 
                             if fin {
                                 let promise = self.process_message();
-                                result_promise = result_promise.then(|_| promise);
+                                result_promise =
+                                    Promise::from_future(result_promise.and_then(|_| promise));
                             }
                         }
                         0x8 => { // TERMINATE
@@ -391,8 +439,9 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                                 &Some(ref client) => {
                                     println!("responding to ping from client");
                                     let req = client.send_bytes_request();
-                                    let promise = req.send().promise.map(|_| Ok(()));
-                                    result_promise = result_promise.then(|_| promise);
+                                    let promise = req.send().promise.map(|_| ());
+                                    result_promise =
+                                        Promise::from_future(result_promise.and_then(|_| promise));
                                 }
                             }
                         }

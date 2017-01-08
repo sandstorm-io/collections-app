@@ -10,14 +10,15 @@ name = "server"
 path = "src/main.rs"
 
 [build-dependencies]
-capnpc = "0.7"
+capnpc = "0.8"
 
 [dependencies]
-gj = "0.2"
-gjio = "0.1"
-capnp = "0.7"
-capnp-rpc = "0.7"
+futures = "0.1"
+tokio-core = "0.1"
+mio-uds = "0.6"
+capnp = "0.8"
+capnp-rpc = "0.8"
 rustc-serialize = "0.3.19"
 url = "1.2"
-sandstorm = "0.0.5"
-
+sandstorm = "0.0.6"
+multipoll = { git = "https://github.com/dwrensha/multipoll" }
