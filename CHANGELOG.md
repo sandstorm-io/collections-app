@@ -1,3 +1,7 @@
+# v1.2.0
+- Reverse the order of grains, so that the most recently added one is at the top.
+- Update backend to use new release of capnp-rpc-rust, based on futures-rs.
+
 # v1.1.1
 - Add validation of tokens returned from powerbox requests.
 
