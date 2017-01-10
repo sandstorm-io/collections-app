@@ -158,7 +158,7 @@ dependencies = [
 [[package]]
 name = "multipoll"
 version = "0.1.0"
-source = "git+https://github.com/dwrensha/multipoll#efd4c9312facce6719674854f730676f068537c5"
+source = "git+https://github.com/dwrensha/multipoll#b311b48baa6c3214c15fbd4e09672467a539d48a"
 dependencies = [
  "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

@@ -51,7 +51,7 @@ fn read_sturdyref_symlink(pointed_to: ::std::path::PathBuf) -> Result<Vec<u8>, E
 struct Reaper;
 
 impl ::multipoll::Finisher<(), Error> for Reaper {
-    fn task_failed(&mut self, error: Error) {
+    fn done_err(&mut self, error: Error) {
         println!("IdentityMap task failed: {}", error);
     }
 }
@@ -160,7 +160,7 @@ impl IdentityMap {
         ::std::fs::create_dir_all(&directory)?;
         ::std::fs::create_dir_all(&trash_directory)?;
 
-        let (tx, poller) = ::multipoll::Poller::new(Box::new(Reaper));
+        let (tx, poller) = ::multipoll::Poller::new(Reaper);
         handle.spawn(poller.map_err(|_|()));
 
         Ok(IdentityMap {

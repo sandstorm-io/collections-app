@@ -194,7 +194,7 @@ fn url_of_static_asset(asset: static_asset::Client) -> Promise<String, Error> {
 struct Reaper;
 
 impl Finisher<(), Error> for Reaper {
-    fn task_failed(&mut self, error: Error) {
+    fn done_err(&mut self, error: Error) {
         // TODO better message.
         println!("task failed: {}", error);
     }
@@ -259,7 +259,7 @@ impl SavedUiViewSet {
             }
         };
 
-        let (tx, poller) = Poller::new(Box::new(Reaper));
+        let (tx, poller) = Poller::new(Reaper);
         handle.spawn(poller.map_err(|_|()));
 
         let result = SavedUiViewSet {
