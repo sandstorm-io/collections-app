@@ -3,7 +3,7 @@ name = "sandstorm-collections-app"
 version = "1.1.0"
 dependencies = [
  "capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnp-rpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp-rpc 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio-uds 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -50,7 +50,7 @@ dependencies = [
 
 [[package]]
 name = "capnp-rpc"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -289,7 +289,7 @@ dependencies = [
 "checksum byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)" = "c40977b0ee6b9885c9013cd41d9feffdd22deb3bb4dc3a71d901cc7a77de18c8"
 "checksum capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a21f6eae08bc436f7ed49fcf8908e203d872119b5d4a14017d9860fe39b48b1c"
 "checksum capnp-futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ec92a85a00f604b2d62c7c9d95f366a8973bd686d7e8aa4f56819d779d06567d"
-"checksum capnp-rpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7990bbac0771fb919a27e9a0d06e4000264d7eede039d0788169c72fdf60a903"
+"checksum capnp-rpc 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d3661d234f46efbdd360845479d2b06078a2112bf7816133abfa27545356c508"
 "checksum capnpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8149aee4db006c20f858ae97acb1abe2a5b2fc0a29f8fba32f8af7ac0289f85a"
 "checksum cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "de1e760d7b6535af4241fca8bd8adf68e2e7edacc6b29f5d399050c5e48cf88c"
 "checksum futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "177a82a61dd7e528022ce97f24e54b499dd2fee4d4646a0f283c5fb500dbfe20"
