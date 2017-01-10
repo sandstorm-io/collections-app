@@ -77,7 +77,7 @@ impl IdentityMapInner {
         req.get().set_token(&sturdyref[..]);
 
         Promise::from_future(req.send().promise.and_then(move |response| {
-            try!(response.get()).get_cap().get_as_capability()
+            response.get()?.get_cap().get_as_capability()
         }))
     }
 
@@ -99,15 +99,15 @@ impl IdentityMapInner {
            // We percent-encode to be safe and to keep the length of the encoded
            // token under 60 bytes in the common case.
 
-           let token = try!(try!(result.get()).get_token());
+           let token = result.get()?.get_token()?;
            let encoded_token = percent_encoding::percent_encode(
                token,
                percent_encoding::DEFAULT_ENCODE_SET
            ).collect::<String>();
 
-           try!(IdentityMapInner::drop_identity(&inner1, &symlink));
+           IdentityMapInner::drop_identity(&inner1, &symlink)?;
 
-           try!(::std::os::unix::fs::symlink(encoded_token, symlink));
+           ::std::os::unix::fs::symlink(encoded_token, symlink)?;
            // TODO fsync?
 
             Ok(())
@@ -123,13 +123,13 @@ impl IdentityMapInner {
                 // symlink exists!
                 let mut trash_file = inner.borrow().trash_directory.clone();
                 trash_file.push(&pointed_to);
-                try!(::std::fs::rename(symlink, &trash_file));
+                ::std::fs::rename(symlink, &trash_file)?;
 
                 let mut req = inner.borrow().api.drop_request();
-                let sturdyref = try!(read_sturdyref_symlink(pointed_to));
+                let sturdyref = read_sturdyref_symlink(pointed_to)?;
                 req.get().set_token(&sturdyref[..]);
                 inner.borrow_mut().tasks.add(req.send().promise.and_then(move |_| {
-                    try!(::std::fs::remove_file(trash_file));
+                    ::std::fs::remove_file(trash_file)?;
                     // TODO fsync?
                     Ok(())
                 }));
@@ -157,8 +157,8 @@ impl IdentityMap {
               Q: AsRef<::std::path::Path>,
     {
         // Create directories if they do not exist yet.
-        try!(::std::fs::create_dir_all(&directory));
-        try!(::std::fs::create_dir_all(&trash_directory));
+        ::std::fs::create_dir_all(&directory)?;
+        ::std::fs::create_dir_all(&trash_directory)?;
 
         let (tx, poller) = ::multipoll::Poller::new(Box::new(Reaper));
         handle.spawn(poller.map_err(|_|()));

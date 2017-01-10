@@ -181,13 +181,13 @@ impl Action {
 
 fn url_of_static_asset(asset: static_asset::Client) -> Promise<String, Error> {
     Promise::from_future(asset.get_url_request().send().promise.and_then(move |response| {
-        let result = try!(response.get());
-        let protocol = match try!(result.get_protocol()) {
+        let result = response.get()?;
+        let protocol = match result.get_protocol()? {
             static_asset::Protocol::Https => "https".to_string(),
             static_asset::Protocol::Http => "http".to_string(),
         };
 
-        Ok(format!("{}://{}", protocol, try!(result.get_host_path())))
+        Ok(format!("{}://{}", protocol, result.get_host_path()?))
     }))
 }
 
@@ -390,8 +390,8 @@ impl SavedUiViewSet {
         };
 
         let temp_path = format!("/var/description.uploading");
-        try!(try!(::std::fs::File::create(&temp_path)).write_all(description));
-        try!(::std::fs::rename(temp_path, "/var/description"));
+        ::std::fs::File::create(&temp_path)?.write_all(description)?;
+        ::std::fs::rename(temp_path, "/var/description")?;
 
         self.inner.borrow_mut().description = desc_string.clone();
         self.send_action_to_subscribers(Action::Description(desc_string));
@@ -906,7 +906,7 @@ impl WebSession {
                 save_label.set_default_text(&format!("grain with title: {}", grain_title)[..]);
             }
             Promise::from_future(req.send().promise.and_then(move |response| {
-                let binary_token = try!(try!(response.get()).get_token());
+                let binary_token = response.get()?.get_token()?;
                 let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
 
                 try!(saved_ui_views.insert(token.clone(), grain_title, identity_id));
