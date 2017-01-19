@@ -5,13 +5,13 @@ dependencies = [
  "capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnp-rpc 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio-uds 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "multipoll 0.1.0 (git+https://github.com/dwrensha/multipoll)",
  "rustc-serialize 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "sandstorm 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "url 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "url 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -35,7 +35,7 @@ version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -45,7 +45,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 0.5.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -56,7 +56,7 @@ dependencies = [
  "capnp 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnp-futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "capnpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -74,7 +74,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "futures"
-version = "0.1.7"
+version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -106,7 +106,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "libc"
-version = "0.2.19"
+version = "0.2.20"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -126,7 +126,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "miow 0.1.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "net2 0.2.26 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -140,7 +140,7 @@ name = "mio-uds"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -160,7 +160,7 @@ name = "multipoll"
 version = "0.1.0"
 source = "git+https://github.com/dwrensha/multipoll#b311b48baa6c3214c15fbd4e09672467a539d48a"
 dependencies = [
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -170,7 +170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -182,7 +182,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "bitflags 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc_version 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "semver 0.1.20 (registry+https://github.com/rust-lang/crates.io-index)",
  "void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -230,7 +230,7 @@ name = "tokio-core"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "scoped-tls 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -252,7 +252,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "url"
-version = "1.2.4"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "idna 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -292,11 +292,11 @@ dependencies = [
 "checksum capnp-rpc 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d3661d234f46efbdd360845479d2b06078a2112bf7816133abfa27545356c508"
 "checksum capnpc 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8149aee4db006c20f858ae97acb1abe2a5b2fc0a29f8fba32f8af7ac0289f85a"
 "checksum cfg-if 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "de1e760d7b6535af4241fca8bd8adf68e2e7edacc6b29f5d399050c5e48cf88c"
-"checksum futures 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)" = "177a82a61dd7e528022ce97f24e54b499dd2fee4d4646a0f283c5fb500dbfe20"
+"checksum futures 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)" = "7463cac13a9c96d3fb5a0d2a653c5cbd6e79997ba153cf407117659aa97afe9b"
 "checksum idna 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1053236e00ce4f668aeca4a769a09b3bf5a682d802abd6f3cb39374f6b162c11"
 "checksum kernel32-sys 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)" = "7507624b29483431c0ba2d82aece8ca6cdba9382bff4ddd0f7490560c056098d"
 "checksum lazycell 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce12306c4739d86ee97c23139f3a34ddf0387bbf181bc7929d287025a8c3ef6b"
-"checksum libc 0.2.19 (registry+https://github.com/rust-lang/crates.io-index)" = "9e030dc72013ed68994d1b2cbf36a94dd0e58418ba949c4b0db7eeb70a7a6352"
+"checksum libc 0.2.20 (registry+https://github.com/rust-lang/crates.io-index)" = "684f330624d8c3784fb9558ca46c4ce488073a8d22450415c5eb4f4cfb0d11b5"
 "checksum log 0.3.6 (registry+https://github.com/rust-lang/crates.io-index)" = "ab83497bf8bf4ed2a74259c1c802351fcd67a65baa86394b6ba73c36f4838054"
 "checksum matches 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "efd7622e3022e1a6eaa602c4cea8912254e5582c9c692e9167714182244801b1"
 "checksum mio 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)" = "5b493dc9fd96bd2077f2117f178172b0765db4dfda3ea4d8000401e6d65d3e80"
@@ -314,7 +314,7 @@ dependencies = [
 "checksum tokio-core 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "0800e9475303171ffbc79394079ef503b6d00949649799208f4fc8f1eca20892"
 "checksum unicode-bidi 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b61814f3e7fd0e0f15370f767c7c943e08bc2e3214233ae8f88522b334ceb778"
 "checksum unicode-normalization 0.1.3 (registry+https://github.com/rust-lang/crates.io-index)" = "5e94e9f6961090fcc75180629c4ef33e5310d6ed2c0dd173f4ca63c9043b669e"
-"checksum url 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "f024e241a55f5c88401595adc1d4af0c9649e91da82d0e190fe55950231ae575"
+"checksum url 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "cbcb1997952b5a73b438a90940834621a8002e59640a8d92a1c05ef8fa58a1da"
 "checksum void 1.0.2 (registry+https://github.com/rust-lang/crates.io-index)" = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"

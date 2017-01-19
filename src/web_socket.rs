@@ -24,7 +24,8 @@ use capnp::Error;
 use std::cell::Cell;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
-use futures::{Future, Poll, Async};
+use futures::{Future};
+use futures::future::{Loop, loop_fn};
 
 #[repr(u8)]
 pub enum OpCode {
@@ -73,44 +74,6 @@ pub fn encode_message(mut params: web_socket_stream::send_bytes_params::Builder,
     params.set_message(&bytes[..]);
 }
 
-struct Loop<F, S, T, E>
-    where F: Fn(S) -> T,
-          T: Future<Item=(S, bool), Error=E>
-{
-    f: F,
-    in_progress: T,
-}
-
-fn run_loop<F, S, T, E>(initial_state: S, f: F) -> Loop<F, S, T, E>
-    where F: Fn(S) -> T,
-          T: Future<Item=(S, bool), Error=E>,
-{
-    let in_progress = f(initial_state);
-    Loop {
-        f: f,
-        in_progress: in_progress,
-    }
-}
-
-impl <F, S, T, E> Future for Loop<F, S, T, E>
-    where F: Fn(S) -> T,
-          T: Future<Item=(S, bool), Error=E>
-{
-    type Item = S;
-    type Error = E;
-
-    fn poll(&mut self) -> Poll<Self::Item, Self::Error> {
-        loop {
-            let (s, more) = try_ready!(self.in_progress.poll());
-            if more {
-                self.in_progress = (self.f)(s);
-            } else {
-                return Ok(Async::Ready(s))
-            }
-        }
-    }
-}
-
 pub enum Message {
   Text(String),
   Data(Vec<u8>),
@@ -124,7 +87,7 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
                 handle: ::tokio_core::reactor::Handle,
                 awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
 {
-    Promise::from_future(run_loop((client_stream, handle, awaiting_pong), move |(client_stream, handle, awaiting_pong)| {
+    Promise::from_future(loop_fn((client_stream, handle, awaiting_pong), move |(client_stream, handle, awaiting_pong)| {
         let mut req = client_stream.send_bytes_request();
         req.get().set_message(&[0x89, 0]); // PING
         let promise = req.send().promise;
@@ -137,11 +100,11 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
                 if awaiting_pong.get() {
                     Err(Error::failed("pong not received within 10 seconds".into()))
                 } else {
-                    Ok(((client_stream, handle, awaiting_pong), true))
+                    Ok(Loop::Continue((client_stream, handle, awaiting_pong)))
                 }
             }))
         })
-    }).map(|_| ()))
+    }))
 }
 
 enum PreviousFrames {
