@@ -27,7 +27,7 @@ dependencies = [
 
 [[package]]
 name = "capnp"
-version = "0.8.17"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -36,31 +36,31 @@ dependencies = [
 
 [[package]]
 name = "capnp-futures"
-version = "0.1.1"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "capnp-rpc"
-version = "0.8.3"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnp-futures 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnpc 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp-futures 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "capnpc"
-version = "0.8.9"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -273,25 +273,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "sandstorm"
-version = "0.0.6"
+version = "0.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnpc 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "sandstorm-collections-app"
 version = "1.2.0"
 dependencies = [
- "capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnp-rpc 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "capnpc 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnp-rpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "capnpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.23 (registry+https://github.com/rust-lang/crates.io-index)",
  "mio-uds 0.6.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "multipoll 0.1.0 (git+https://github.com/dwrensha/multipoll)",
  "rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)",
- "sandstorm 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "sandstorm 0.0.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-core 0.1.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "url 1.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -517,10 +517,10 @@ dependencies = [
 "checksum bitflags 1.0.3 (registry+https://github.com/rust-lang/crates.io-index)" = "d0c54bb8f454c567f21197eefcdbf5679d0bd99f2ddbe52e84c77061952e6789"
 "checksum byteorder 1.2.4 (registry+https://github.com/rust-lang/crates.io-index)" = "8389c509ec62b9fe8eca58c502a0acaf017737355615243496cde4994f8fa4f9"
 "checksum bytes 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)" = "e178b8e0e239e844b083d5a0d4a156b2654e67f9f80144d48398fcd736a24fb8"
-"checksum capnp 0.8.17 (registry+https://github.com/rust-lang/crates.io-index)" = "6565c3d71656d15ecd36ed98ad769de1fd55c990a426f4c865f80ace97aa1162"
-"checksum capnp-futures 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "1b12f9d23b322429af59176bf778d1ae46a4c5e55375818509f9c2f2a11bed7a"
-"checksum capnp-rpc 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)" = "70f14a7334022d7099d1acec8b9dc0802ce4dd6d035cbf59f9c3a798582ba00d"
-"checksum capnpc 0.8.9 (registry+https://github.com/rust-lang/crates.io-index)" = "205d5ba2ff15737f80817ba9b1e9e5d5cdb99d832be830a048033ad2e5bb2871"
+"checksum capnp 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b3cfa57795aeab467713586aa427c82c9ea0bf917c641c95cd7966f0681ecd80"
+"checksum capnp-futures 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "257f769e90247bceade3fc8dc1f26b89d48e84414b0495eeecbe904eba890690"
+"checksum capnp-rpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ce375f1b92bb3ae0eb3edc7409528cbfb17f35612feca67e49c38a6f29570046"
+"checksum capnpc 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)" = "6f85b818d7d9d63ca794b96b00ff28e2c44cfeeec6adb44fa4b4de8e05eb4e75"
 "checksum cfg-if 0.1.4 (registry+https://github.com/rust-lang/crates.io-index)" = "efe5c877e17a9c717a0bf3613b2709f723202c4e4675cc8f12926ded29bcb17e"
 "checksum crossbeam-deque 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "fe8153ef04a7594ded05b427ffad46ddeaf22e63fd48d42b3e1e3bb4db07cae7"
 "checksum crossbeam-epoch 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2af0e75710d6181e234c8ecc79f14a97907850a541b13b0be1dd10992f2e4620"
@@ -547,7 +547,7 @@ dependencies = [
 "checksum percent-encoding 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "31010dd2e1ac33d5b46a5b413495239882813e0369f8ed8a5e266f173602f831"
 "checksum rand 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)" = "eba5f8cb59cc50ed56be8880a5c7b496bfd9bd26394e176bc67884094145c2c5"
 "checksum rustc-serialize 0.3.24 (registry+https://github.com/rust-lang/crates.io-index)" = "dcf128d1287d2ea9d80910b5f1120d0b8eede3fbf1abe91c40d39ea7d51e6fda"
-"checksum sandstorm 0.0.6 (registry+https://github.com/rust-lang/crates.io-index)" = "834c109880e98f259fd86aeb05832c4b8ecebd7520864a06066e111bce4fc932"
+"checksum sandstorm 0.0.7 (registry+https://github.com/rust-lang/crates.io-index)" = "47035aa63658a7bd6a26904bc7f60ef057ee10c6d7e4a14e7b359c887a778c69"
 "checksum scoped-tls 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "332ffa32bf586782a3efaeb58f127980944bbc8c4d6913a86107ac2a5ab24b28"
 "checksum scopeguard 0.3.3 (registry+https://github.com/rust-lang/crates.io-index)" = "94258f53601af11e6a49f722422f6e3425c52b06245a5cf9bc09908b174f5e27"
 "checksum slab 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)" = "5f9776d6b986f77b35c6cf846c11ad986ff128fe0b2b63a3628e3755e8d3102d"
