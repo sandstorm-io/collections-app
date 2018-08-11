@@ -19,7 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-#[macro_use] extern crate futures;
+extern crate futures;
 extern crate tokio_core;
 extern crate mio_uds;
 extern crate capnp;

@@ -1011,25 +1011,25 @@ impl ui_view::Server for UiView {
         // Define a "write" permission, and then define roles "editor" and "viewer" where only
         // "editor" has the "write" permission. This will allow people to share read-only.
         {
-            let perms = view_info.borrow().init_permissions(1);
+            let perms = view_info.reborrow().init_permissions(1);
             let mut write = perms.get(0);
             write.set_name("write");
             write.init_title().set_default_text("write");
         }
 
         {
-            let mut roles = view_info.borrow().init_roles(2);
+            let mut roles = view_info.reborrow().init_roles(2);
             {
-                let mut editor = roles.borrow().get(0);
-                editor.borrow().init_title().set_default_text("editor");
-                editor.borrow().init_verb_phrase().set_default_text("can edit");
+                let mut editor = roles.reborrow().get(0);
+                editor.reborrow().init_title().set_default_text("editor");
+                editor.reborrow().init_verb_phrase().set_default_text("can edit");
                 editor.init_permissions(1).set(0, true);   // has "write" permission
             }
             {
                 let mut viewer = roles.get(1);
                 viewer.set_default(true);
-                viewer.borrow().init_title().set_default_text("viewer");
-                viewer.borrow().init_verb_phrase().set_default_text("can view");
+                viewer.reborrow().init_title().set_default_text("viewer");
+                viewer.reborrow().init_verb_phrase().set_default_text("can view");
                 viewer.init_permissions(1).set(0, false);  // does not have "write" permission
             }
         }
@@ -1037,19 +1037,19 @@ impl ui_view::Server for UiView {
         {
             let mut event_types = view_info.init_event_types(3);
             {
-                let mut added = event_types.borrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
+                let mut added = event_types.reborrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
                 added.set_name("add");
-                added.borrow().init_verb_phrase().set_default_text("added grain");
+                added.reborrow().init_verb_phrase().set_default_text("added grain");
             }
             {
-                let mut removed = event_types.borrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
+                let mut removed = event_types.reborrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
                 removed.set_name("remove");
-                removed.borrow().init_verb_phrase().set_default_text("removed grain");
+                removed.reborrow().init_verb_phrase().set_default_text("removed grain");
             }
             {
-                let mut removed = event_types.borrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
+                let mut removed = event_types.reborrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
                 removed.set_name("description");
-                removed.borrow().init_verb_phrase().set_default_text("edited description");
+                removed.reborrow().init_verb_phrase().set_default_text("edited description");
             }
         }
 
@@ -1143,7 +1143,7 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
     let mut rpc_system = RpcSystem::new(network, Some(client.client));
 
     tx.complete(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
-                ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
+        ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
 
     try!(core.run(rpc_system));
     Ok(())
