@@ -20,5 +20,5 @@ capnp = "0.9"
 capnp-rpc = "0.9"
 rustc-serialize = "0.3.19"
 url = "1.2"
-sandstorm = "0.0.7"
+sandstorm = "0.0.8"
 multipoll = { git = "https://github.com/dwrensha/multipoll" }
