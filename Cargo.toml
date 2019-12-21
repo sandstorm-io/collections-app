@@ -3,6 +3,7 @@ name = "sandstorm-collections-app"
 version = "1.2.0"
 authors = ["David Renshaw <david@sandstorm.io>"]
 build = "build.rs"
+edition = "2018"
 
 [[bin]]
 

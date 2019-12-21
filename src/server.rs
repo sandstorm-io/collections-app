@@ -31,9 +31,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use futures::Future;
-use collections_capnp::ui_view_metadata;
-use web_socket;
-use identity_map::IdentityMap;
+use crate::collections_capnp::ui_view_metadata;
+use crate::web_socket;
+use crate::identity_map::IdentityMap;
 
 use sandstorm::powerbox_capnp::powerbox_descriptor;
 use sandstorm::identity_capnp::{user_info};
@@ -214,7 +214,7 @@ struct SavedUiViewSetInner {
     tasks: PollerHandle<(), Error>,
     description: String,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-    identity_map: ::identity_map::IdentityMap,
+    identity_map: IdentityMap,
 
 }
 
@@ -233,7 +233,7 @@ impl SavedUiViewSet {
     pub fn new<P1, P2>(tmp_dir: P1,
                        sturdyref_dir: P2,
                        sandstorm_api: &sandstorm_api::Client<::capnp::any_pointer::Owned>,
-                       identity_map: ::identity_map::IdentityMap,
+                       identity_map: IdentityMap,
                        handle: &::tokio_core::reactor::Handle,
     )
                   -> ::capnp::Result<SavedUiViewSet>
@@ -244,14 +244,14 @@ impl SavedUiViewSet {
             Ok(mut f) => {
                 use std::io::Read;
                 let mut result = String::new();
-                try!(f.read_to_string(&mut result));
+                f.read_to_string(&mut result)?;
                 result
             }
             Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => {
                 use std::io::Write;
-                let mut f = try!(::std::fs::File::create("/var/description"));
+                let mut f = ::std::fs::File::create("/var/description")?;
                 let result = "";
-                try!(f.write_all(result.as_bytes()));
+                f.write_all(result.as_bytes())?;
                 result.into()
             }
             Err(e) => {
@@ -278,7 +278,7 @@ impl SavedUiViewSet {
         };
 
         // create sturdyref directory if it does not yet exist
-        try!(::std::fs::create_dir_all(&sturdyref_dir));
+        ::std::fs::create_dir_all(&sturdyref_dir)?;
 
         // clear and create tmp directory
         match ::std::fs::remove_dir_all(&tmp_dir) {
@@ -286,10 +286,10 @@ impl SavedUiViewSet {
             Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => (),
             Err(e) => return Err(e.into()),
         }
-        try!(::std::fs::create_dir_all(&tmp_dir));
+        ::std::fs::create_dir_all(&tmp_dir)?;
 
-        for token_file in try!(::std::fs::read_dir(&sturdyref_dir)) {
-            let dir_entry = try!(token_file);
+        for token_file in ::std::fs::read_dir(&sturdyref_dir)? {
+            let dir_entry = token_file?;
             let token: String = match dir_entry.file_name().to_str() {
                 None => {
                     println!("malformed token: {:?}", dir_entry.file_name());
@@ -300,28 +300,28 @@ impl SavedUiViewSet {
 
             if token.ends_with(".uploading") {
                 // At one point, these temporary files got uploading directly into this directory.
-                try!(::std::fs::remove_file(dir_entry.path()));
+                ::std::fs::remove_file(dir_entry.path())?;
             } else {
-                let mut reader = try!(::std::fs::File::open(dir_entry.path()));
-                let message = try!(::capnp::serialize::read_message(&mut reader,
-                                                                    Default::default()));
-                let metadata: ui_view_metadata::Reader = try!(message.get_root());
+                let mut reader = ::std::fs::File::open(dir_entry.path())?;
+                let message = ::capnp::serialize::read_message(&mut reader,
+                                                               Default::default())?;
+                let metadata: ui_view_metadata::Reader = message.get_root()?;
 
                 let added_by = if metadata.has_added_by() {
-                    Some(try!(metadata.get_added_by()).into())
+                    Some(metadata.get_added_by()?.into())
                 } else {
                     None
                 };
 
                 let entry = SavedUiViewData {
-                    title: try!(metadata.get_title()).into(),
+                    title: metadata.get_title()?.into(),
                     date_added: metadata.get_date_added(),
                     added_by: added_by,
                 };
 
                 result.inner.borrow_mut().views.insert(token.clone(), entry);
 
-                try!(result.retrieve_view_info(token));
+                result.retrieve_view_info(token)?;
             }
         }
 
@@ -402,8 +402,8 @@ impl SavedUiViewSet {
               token: String,
               title: String,
               added_by: Option<String>) -> ::capnp::Result<()> {
-        let dur = try!(::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH)
-            .map_err(|e| Error::failed(format!("{}", e))));
+        let dur = ::std::time::SystemTime::now().duration_since(::std::time::UNIX_EPOCH)
+            .map_err(|e| Error::failed(format!("{}", e)))?;
         let date_added = dur.as_secs() * 1000 + (dur.subsec_nanos() / 1000000) as u64;
 
         let mut token_path = ::std::path::PathBuf::new();
@@ -414,7 +414,7 @@ impl SavedUiViewSet {
         temp_path.push(self.inner.borrow().tmp_dir.clone());
         temp_path.push(format!("{}.uploading", token));
 
-        let mut writer = try!(::std::fs::File::create(&temp_path));
+        let mut writer = ::std::fs::File::create(&temp_path)?;
 
         let mut message = ::capnp::message::Builder::new_default();
         {
@@ -427,9 +427,9 @@ impl SavedUiViewSet {
             }
         }
 
-        try!(::capnp::serialize::write_message(&mut writer, &message));
-        try!(::std::fs::rename(temp_path, token_path));
-        try!(writer.sync_all());
+        ::capnp::serialize::write_message(&mut writer, &message)?;
+        ::std::fs::rename(temp_path, token_path)?;
+        writer.sync_all()?;
 
         if !self.inner.borrow().subscribers.is_empty() {
             if let Some(ref id) = added_by {
@@ -561,7 +561,7 @@ impl SavedUiViewSet {
                 WebSocketStream::new(id, self.clone()),
                 client_stream,
                 handle.clone(),
-                self.inner.borrow().tasks.clone())).from_server::<::capnp_rpc::Server>()
+                self.inner.borrow().tasks.clone())).into_client::<::capnp_rpc::Server>()
     }
 }
 
@@ -588,11 +588,11 @@ impl WebSession {
                -> ::capnp::Result<WebSession>
     {
         // Permission #0 is "write". Check if bit 0 in the PermissionSet is set.
-        let permissions = try!(user_info.get_permissions());
+        let permissions = user_info.get_permissions()?;
         let can_write = permissions.len() > 0 && permissions.get(0);
 
         let identity_id = if user_info.has_identity_id() {
-            Some(hex::ToHex::to_hex(try!(user_info.get_identity_id())))
+            Some(hex::ToHex::to_hex(user_info.get_identity_id()?))
         } else {
             None
         };
@@ -854,15 +854,15 @@ impl WebSession {
     fn read_powerbox_tag(&mut self, decoded_content: Vec<u8>) -> ::capnp::Result<String>
     {
         let mut cursor = ::std::io::Cursor::new(decoded_content);
-        let message = try!(::capnp::serialize_packed::read_message(&mut cursor,
-                                                                   Default::default()));
-        let desc: powerbox_descriptor::Reader = try!(message.get_root());
-        let tags = try!(desc.get_tags());
+        let message = ::capnp::serialize_packed::read_message(&mut cursor,
+                                                              Default::default())?;
+        let desc: powerbox_descriptor::Reader = message.get_root()?;
+        let tags = desc.get_tags()?;
         if tags.len() == 0 {
             Err(Error::failed("no powerbox tag".into()))
         } else {
-            let value: ui_view::powerbox_tag::Reader = try!(tags.get(0).get_value().get_as());
-            Ok(try!(value.get_title()).into())
+            let value: ui_view::powerbox_tag::Reader = tags.get(0).get_value().get_as()?;
+            Ok(value.get_title()?.into())
         }
     }
 
@@ -909,9 +909,9 @@ impl WebSession {
                 let binary_token = response.get()?.get_token()?;
                 let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
 
-                try!(saved_ui_views.insert(token.clone(), grain_title, identity_id));
+                saved_ui_views.insert(token.clone(), grain_title, identity_id)?;
 
-                try!(SavedUiViewSet::retrieve_view_info(&saved_ui_views, token));
+                SavedUiViewSet::retrieve_view_info(&saved_ui_views, token)?;
                 Ok(())
             }))
         });
@@ -1079,7 +1079,7 @@ impl ui_view::Server for UiView {
             self.sandstorm_api.clone(),
             self.saved_ui_views.clone()));
         let client: web_session::Client =
-            web_session::ToClient::new(session).from_server::<::capnp_rpc::Server>();
+            web_session::ToClient::new(session).into_client::<::capnp_rpc::Server>();
 
         // We need to do this silly dance to upcast.
         results.get().set_session(ui_session::Client { client : client.client});
@@ -1095,17 +1095,17 @@ impl ui_view::Server for UiView {
     }
 }
 
-pub fn main() -> Result<(), Box<::std::error::Error>> {
+pub fn main() -> Result<(), Box<dyn std::error::Error>> {
     use tokio_core::io::Io;
     use ::std::os::unix::io::{FromRawFd, IntoRawFd};
 
-    let mut core = try!(::tokio_core::reactor::Core::new());
+    let mut core = ::tokio_core::reactor::Core::new()?;
     let handle = core.handle();
 
     let stream: ::std::os::unix::net::UnixStream = unsafe { FromRawFd::from_raw_fd(3) };
-    try!(stream.set_nonblocking(true));
+    stream.set_nonblocking(true)?;
     let stream: ::mio_uds::UnixStream = unsafe { FromRawFd::from_raw_fd(stream.into_raw_fd()) };
-    let stream = try!(::tokio_core::reactor::PollEvented::new(stream, &handle));
+    let stream = ::tokio_core::reactor::PollEvented::new(stream, &handle)?;
 
     let (read_half, write_half) = stream.split();
 
@@ -1120,17 +1120,17 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
             ::capnp_rpc::new_promise_client(rx.map_err(|e| e.into()));
 
 
-    let identity_map = try!(IdentityMap::new(
+    let identity_map = IdentityMap::new(
         "/var/identities",
         "/var/trash",
         &sandstorm_api,
-        &handle));
-    let saved_uiviews = try!(SavedUiViewSet::new(
+        &handle)?;
+    let saved_uiviews = SavedUiViewSet::new(
         "/var/tmp",
         "/var/sturdyrefs",
         &sandstorm_api,
         identity_map,
-        &handle));
+        &handle)?;
 
 
     let uiview = UiView::new(
@@ -1138,13 +1138,13 @@ pub fn main() -> Result<(), Box<::std::error::Error>> {
         sandstorm_api,
         saved_uiviews);
 
-    let client = ui_view::ToClient::new(uiview).from_server::<::capnp_rpc::Server>();
+    let client = ui_view::ToClient::new(uiview).into_client::<::capnp_rpc::Server>();
 
     let mut rpc_system = RpcSystem::new(network, Some(client.client));
 
-    tx.complete(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
+    tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
         ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
 
-    try!(core.run(rpc_system));
+    core.run(rpc_system)?;
     Ok(())
 }
