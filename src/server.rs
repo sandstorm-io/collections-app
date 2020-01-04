@@ -30,7 +30,7 @@ use std::collections::hash_set::HashSet;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use futures::Future;
+use futures::{FutureExt, TryFutureExt};
 use crate::collections_capnp::ui_view_metadata;
 use crate::web_socket;
 use crate::identity_map::IdentityMap;
@@ -180,21 +180,26 @@ impl Action {
 }
 
 fn url_of_static_asset(asset: static_asset::Client) -> Promise<String, Error> {
-    Promise::from_future(asset.get_url_request().send().promise.and_then(move |response| {
-        let result = response.get()?;
-        let protocol = match result.get_protocol()? {
-            static_asset::Protocol::Https => "https".to_string(),
-            static_asset::Protocol::Http => "http".to_string(),
-        };
+    Promise::from_future(asset.get_url_request().send().promise.map(
+        move |r| match r {
+            Ok(response) => {
+                let result = response.get()?;
+                let protocol = match result.get_protocol()? {
+                    static_asset::Protocol::Https => "https".to_string(),
+                    static_asset::Protocol::Http => "http".to_string(),
+                };
 
-        Ok(format!("{}://{}", protocol, result.get_host_path()?))
-    }))
+                Ok(format!("{}://{}", protocol, result.get_host_path()?))
+            }
+            Err(e) => Err(e),
+        }
+    ))
 }
 
 struct Reaper;
 
-impl Finisher<(), Error> for Reaper {
-    fn done_err(&mut self, error: Error) {
+impl Finisher<Error> for Reaper {
+    fn task_failed(&mut self, error: Error) {
         // TODO better message.
         println!("task failed: {}", error);
     }
@@ -211,7 +216,7 @@ struct SavedUiViewSetInner {
     view_infos: HashMap<String, Result<ViewInfoData, Error>>,
     next_id: u64,
     subscribers: HashMap<u64, web_socket_stream::Client>,
-    tasks: PollerHandle<(), Error>,
+    tasks: PollerHandle<Error>,
     description: String,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     identity_map: IdentityMap,
@@ -234,7 +239,6 @@ impl SavedUiViewSet {
                        sturdyref_dir: P2,
                        sandstorm_api: &sandstorm_api::Client<::capnp::any_pointer::Owned>,
                        identity_map: IdentityMap,
-                       handle: &::tokio_core::reactor::Handle,
     )
                   -> ::capnp::Result<SavedUiViewSet>
         where P1: AsRef<::std::path::Path>,
@@ -259,8 +263,8 @@ impl SavedUiViewSet {
             }
         };
 
-        let (tx, poller) = Poller::new(Reaper);
-        handle.spawn(poller.map_err(|_|()));
+        let (tx, poller) = Poller::new(Box::new(Reaper));
+        tokio::task::spawn_local(poller.map_err(|_|()));
 
         let result = SavedUiViewSet {
             inner: Rc::new(RefCell::new(SavedUiViewSetInner {
@@ -347,14 +351,14 @@ impl SavedUiViewSet {
             Promise::from_future(view.get_view_info_request().send().promise.and_then(move |response| {
                 let view_info = pry!(response.get());
                 let app_title = pry!(pry!(view_info.get_app_title()).get_default_text()).to_string();
-                Promise::from_future(url_of_static_asset(pry!(view_info.get_grain_icon())).map(move |url| {
+                Promise::from_future(url_of_static_asset(pry!(view_info.get_grain_icon())).map_ok(move |url| {
                     ViewInfoData {
                         app_title: app_title,
                         grain_icon_url: url,
                     }
                 }))
             }))
-        }).then(move |result| {
+        }).map(move |result| {
             self1.inner.borrow_mut().view_infos.insert(token.clone(), result.clone());
             self1.send_action_to_subscribers(Action::ViewInfo {
                 token: token,
@@ -375,7 +379,7 @@ impl SavedUiViewSet {
         }).and_then(move |response| {
             let profile = pry!(pry!(response.get()).get_profile());
             let display_name = pry!(pry!(profile.get_display_name()).get_default_text()).to_string();
-            Promise::from_future(url_of_static_asset(pry!(profile.get_picture())).map(move |url| {
+            Promise::from_future(url_of_static_asset(pry!(profile.get_picture())).map_ok(move |url| {
                 ProfileData { display_name: display_name, picture_url: url }
             }))
         }))
@@ -435,7 +439,7 @@ impl SavedUiViewSet {
             if let Some(ref id) = added_by {
                 let mut self1 = self.clone();
                 let identity_id: String = id.to_string();
-                let task = self.get_user_profile(&identity_id).map(move |profile_data| {
+                let task = self.get_user_profile(&identity_id).map_ok(move |profile_data| {
                     self1.send_action_to_subscribers(
                         Action::User { id: identity_id, data: profile_data });
                 });
@@ -465,7 +469,7 @@ impl SavedUiViewSet {
         for (_, sub) in &*subscribers {
             let mut req = sub.send_bytes_request();
             web_socket::encode_text_message(req.get(), &json_string);
-            tasks.add(req.send().promise.map(|_| ()));
+            tasks.add(req.send().promise.map_ok(|_| ()));
         }
     }
 
@@ -486,8 +490,7 @@ impl SavedUiViewSet {
     fn new_subscribed_websocket(&mut self,
                                 client_stream: web_socket_stream::Client,
                                 can_write: bool,
-                                user_id: Option<String>,
-                                handle: &::tokio_core::reactor::Handle)
+                                user_id: Option<String>)
                                  -> web_socket_stream::Client
     {
         fn send_action(task: Promise<(), Error>,
@@ -496,7 +499,7 @@ impl SavedUiViewSet {
             let json_string = action.to_json();
             let mut req = client_stream.send_bytes_request();
             web_socket::encode_text_message(req.get(), &json_string);
-            let promise = req.send().promise.map(|_| ());
+            let promise = req.send().promise.map_ok(|_| ());
             Promise::from_future(task.and_then(|_| promise))
         }
 
@@ -549,7 +552,7 @@ impl SavedUiViewSet {
                 let json_string = action.to_json();
                 let mut req = client_stream1.send_bytes_request();
                 web_socket::encode_text_message(req.get(), &json_string);
-                req.send().promise.map(|_| ())
+                req.send().promise.map_ok(|_| ())
             });
 
             self.inner.borrow_mut().tasks.add(task);
@@ -560,7 +563,6 @@ impl SavedUiViewSet {
             web_socket::Adapter::new(
                 WebSocketStream::new(id, self.clone()),
                 client_stream,
-                handle.clone(),
                 self.inner.borrow().tasks.clone())).into_client::<::capnp_rpc::Server>()
     }
 }
@@ -570,7 +572,6 @@ const REMOVE_GRAIN_ACTIVITY_INDEX: u16 = 1;
 const EDIT_DESCRIPTION_ACTIVITY_INDEX: u16 = 2;
 
 pub struct WebSession {
-    handle: ::tokio_core::reactor::Handle,
     can_write: bool,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     context: session_context::Client,
@@ -579,8 +580,7 @@ pub struct WebSession {
 }
 
 impl WebSession {
-    pub fn new(handle: ::tokio_core::reactor::Handle,
-               user_info: user_info::Reader,
+    pub fn new(user_info: user_info::Reader,
                context: session_context::Client,
                _params: web_session::params::Reader,
                sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
@@ -598,7 +598,6 @@ impl WebSession {
         };
 
         Ok(WebSession {
-            handle: handle,
             can_write: can_write,
             sandstorm_api: sandstorm_api,
             context: context,
@@ -667,7 +666,7 @@ impl web_session::Server for WebSession {
         };
 
         if path.starts_with("token/") {
-            self.receive_request_token(path[6..].to_string(), params, results)
+            Promise::from_future(self.receive_request_token(path[6..].to_string(), params, results))
         } else if path.starts_with("offer/") {
             let token = path[6..].to_string();
             let title = match self.saved_ui_views.inner.borrow().get_saved_data(&token) {
@@ -719,7 +718,7 @@ impl web_session::Server for WebSession {
             pry!(self.saved_ui_views.update_description(content));
             let mut req = self.context.activity_request();
             req.get().init_event().set_type(EDIT_DESCRIPTION_ACTIVITY_INDEX);
-            Promise::from_future(req.send().promise.map(move |_| {
+            Promise::from_future(req.send().promise.map_ok(move |_| {
                 results.get().init_no_content();
             }))
         } else {
@@ -784,8 +783,7 @@ impl web_session::Server for WebSession {
             self.saved_ui_views.new_subscribed_websocket(
                 client_stream,
                 self.can_write,
-                self.identity_id.clone(),
-                &self.handle));
+                self.identity_id.clone()));
 
         Promise::ok(())
     }
@@ -829,7 +827,7 @@ impl WebSession {
                     value.set_title(&title);
                 }
 
-                Promise::from_future(req.send().promise.map(|_| ()))
+                Promise::from_future(req.send().promise.map_ok(|_| ()))
             }
             Err(e) => {
                 set.inner.borrow_mut().view_infos.insert(text_token.clone(), Err(e.clone()));
@@ -905,7 +903,8 @@ impl WebSession {
                 let mut save_label = req.get().init_label();
                 save_label.set_default_text(&format!("grain with title: {}", grain_title)[..]);
             }
-            Promise::from_future(req.send().promise.and_then(move |response| {
+            Promise::from_future(req.send().promise.map(move |r| {
+                let response = r?;
                 let binary_token = response.get()?.get_token()?;
                 let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
 
@@ -981,19 +980,16 @@ impl WebSession {
 }
 
 pub struct UiView {
-    handle: ::tokio_core::reactor::Handle,
     sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
     saved_ui_views: SavedUiViewSet,
 }
 
 impl UiView {
-    fn new(handle: ::tokio_core::reactor::Handle,
-           client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
+    fn new(client: sandstorm_api::Client<::capnp::any_pointer::Owned>,
            saved_ui_views: SavedUiViewSet)
            -> UiView
     {
         UiView {
-            handle: handle,
             sandstorm_api: client,
             saved_ui_views: saved_ui_views,
         }
@@ -1072,7 +1068,6 @@ impl ui_view::Server for UiView {
         let user_info = pry!(params.get_user_info());
 
         let session = pry!(WebSession::new(
-            self.handle.clone(),
             user_info.clone(),
             pry!(params.get_context()),
             pry!(params.get_session_params().get_as()),
@@ -1096,55 +1091,48 @@ impl ui_view::Server for UiView {
 }
 
 pub fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use tokio_core::io::Io;
-    use ::std::os::unix::io::{FromRawFd, IntoRawFd};
+    use ::std::os::unix::io::{FromRawFd};
+    use futures::io::AsyncReadExt;
 
-    let mut core = ::tokio_core::reactor::Core::new()?;
-    let handle = core.handle();
+    let mut rt = tokio::runtime::Runtime::new().unwrap();
+    let local = tokio::task::LocalSet::new();
 
-    let stream: ::std::os::unix::net::UnixStream = unsafe { FromRawFd::from_raw_fd(3) };
-    stream.set_nonblocking(true)?;
-    let stream: ::mio_uds::UnixStream = unsafe { FromRawFd::from_raw_fd(stream.into_raw_fd()) };
-    let stream = ::tokio_core::reactor::PollEvented::new(stream, &handle)?;
+    local.block_on(&mut rt, async move {
+        let stream: ::std::os::unix::net::UnixStream = unsafe { FromRawFd::from_raw_fd(3) };
+        let stream = tokio::net::UnixStream::from_std(stream)?;
+        let (read_half, write_half) = futures_tokio_compat::Compat::new(stream).split();
 
-    let (read_half, write_half) = stream.split();
+        let network =
+            Box::new(twoparty::VatNetwork::new(read_half, write_half,
+                                               rpc_twoparty_capnp::Side::Client,
+                                               Default::default()));
 
-    let network =
-        Box::new(twoparty::VatNetwork::new(read_half, write_half,
-                                           rpc_twoparty_capnp::Side::Client,
-                                           Default::default()));
+        let (tx, rx) = futures::channel::oneshot::channel();
+        let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
+            ::capnp_rpc::new_promise_client(rx.map_err(|_e| capnp::Error::failed(format!("oneshot was canceled"))));
 
+        let identity_map = IdentityMap::new(
+            "/var/identities",
+            "/var/trash",
+            &sandstorm_api)?;
+        let saved_uiviews = SavedUiViewSet::new(
+            "/var/tmp",
+            "/var/sturdyrefs",
+            &sandstorm_api,
+            identity_map)?;
 
-    let (tx, rx) = ::futures::sync::oneshot::channel();
-    let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
-            ::capnp_rpc::new_promise_client(rx.map_err(|e| e.into()));
+        let uiview = UiView::new(
+            sandstorm_api,
+            saved_uiviews);
 
+        let client = ui_view::ToClient::new(uiview).into_client::<::capnp_rpc::Server>();
 
-    let identity_map = IdentityMap::new(
-        "/var/identities",
-        "/var/trash",
-        &sandstorm_api,
-        &handle)?;
-    let saved_uiviews = SavedUiViewSet::new(
-        "/var/tmp",
-        "/var/sturdyrefs",
-        &sandstorm_api,
-        identity_map,
-        &handle)?;
+        let mut rpc_system = RpcSystem::new(network, Some(client.client));
 
+        let _ = tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
+            ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
 
-    let uiview = UiView::new(
-        handle.clone(),
-        sandstorm_api,
-        saved_uiviews);
-
-    let client = ui_view::ToClient::new(uiview).into_client::<::capnp_rpc::Server>();
-
-    let mut rpc_system = RpcSystem::new(network, Some(client.client));
-
-    tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
-        ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
-
-    core.run(rpc_system)?;
+        Ok::<_,  Box<dyn (std::error::Error)>>(rpc_system.await?)
+    })?;
     Ok(())
 }

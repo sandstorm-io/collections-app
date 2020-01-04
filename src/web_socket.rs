@@ -22,10 +22,26 @@
 use capnp::capability::Promise;
 use capnp::Error;
 use std::cell::Cell;
+use std::pin::Pin;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
-use futures::{Future};
-use futures::future::{Loop, loop_fn};
+use futures::{future, Future, FutureExt, TryFutureExt};
+use futures::channel::oneshot;
+
+fn eagerly_evaluate<T, F>(handle: & mut::multipoll::PollerHandle<Error>, task: F) -> Promise<T, Error>
+    where F: Future<Output=Result<T,Error>> + 'static + Unpin,
+          T: 'static
+{
+    let (tx, rx) = oneshot::channel::<Result<T,Error>>();
+    let (tx2, rx2) = oneshot::channel::<()>();
+    let f1 = Box::pin(task.map(move |r| { let _ = tx.send(r);}))
+        as Pin<Box<dyn Future<Output = ()> + Unpin>>;
+    let f2 = Box::pin(rx2.map(drop))
+        as Pin<Box<dyn Future<Output = ()> + Unpin>>;
+
+    handle.add(future::select(f1, f2).map(|_| Ok(())));
+    Promise::from_future(rx.map_err(|_| Error::failed(format!("oneshot was canceled"))).map(|r| {drop(tx2); r?}))
+}
 
 #[repr(u8)]
 pub enum OpCode {
@@ -84,27 +100,21 @@ pub trait MessageHandler {
 }
 
 fn do_ping_pong(client_stream: web_socket_stream::Client,
-                handle: ::tokio_core::reactor::Handle,
                 awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
 {
-    Promise::from_future(loop_fn((client_stream, handle, awaiting_pong), move |(client_stream, handle, awaiting_pong)| {
+    Promise::from_future(async move {
         let mut req = client_stream.send_bytes_request();
         req.get().set_message(&[0x89, 0]); // PING
         let promise = req.send().promise;
         awaiting_pong.set(true);
-        promise.then(move |_| {
-            let timeout = pry!(::tokio_core::reactor::Timeout::new(
-                ::std::time::Duration::new(10, 0),
-                &handle));
-            Promise::from_future(timeout.map_err(Into::into).and_then(move |_| {
-                if awaiting_pong.get() {
-                    Err(Error::failed("pong not received within 10 seconds".into()))
-                } else {
-                    Ok(Loop::Continue((client_stream, handle, awaiting_pong)))
-                }
-            }))
-        })
-    }))
+        let _ = promise.await?;
+        let () =  tokio::time::delay_for(::std::time::Duration::new(10, 0)).await;
+        if awaiting_pong.get() {
+            Err(Error::failed("pong not received within 10 seconds".into()))
+        } else {
+            do_ping_pong(client_stream, awaiting_pong).await
+        }
+    })
 }
 
 enum PreviousFrames {
@@ -276,21 +286,19 @@ pub struct Adapter<T> where T: MessageHandler {
 impl <T> Adapter<T> where T: MessageHandler {
     pub fn new(handler: T,
                client_stream: web_socket_stream::Client,
-               reactor_handle: ::tokio_core::reactor::Handle,
-               mut task_handle: ::multipoll::PollerHandle<(), Error>)
+               mut task_handle: ::multipoll::PollerHandle<Error>)
                -> Adapter<T> {
         let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = Promise::from_future(task_handle.eagerly_evaluate(do_ping_pong(
+        let ping_pong_promise = Promise::from_future(eagerly_evaluate(&mut task_handle, do_ping_pong(
             client_stream.clone(),
-            reactor_handle,
             awaiting.clone()
-        ).then(|r| match r {
+        ).map(|r| match r {
             Ok(_) => Ok(()),
             Err(e) => {
                 println!("error while pinging client: {}", e);
                 Ok(())
             }
-        })).map(|_| ()).map_err(|e| e.into()));
+        })).map_ok(|_| ()).map_err(|e| e.into()));
 
         Adapter {
             handler: Some(handler),
@@ -402,7 +410,7 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                                 &Some(ref client) => {
                                     println!("responding to ping from client");
                                     let req = client.send_bytes_request();
-                                    let promise = req.send().promise.map(|_| ());
+                                    let promise = req.send().promise.map_ok(|_| ());
                                     result_promise =
                                         Promise::from_future(result_promise.and_then(|_| promise));
                                 }

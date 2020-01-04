@@ -21,7 +21,7 @@
 
 use capnp::capability::Promise;
 use capnp::Error;
-use futures::Future;
+use futures::{FutureExt, TryFutureExt};
 use url::percent_encoding;
 use rustc_serialize::{hex};
 use std::cell::RefCell;
@@ -50,8 +50,8 @@ fn read_sturdyref_symlink(pointed_to: ::std::path::PathBuf) -> Result<Vec<u8>, E
 
 struct Reaper;
 
-impl ::multipoll::Finisher<(), Error> for Reaper {
-    fn done_err(&mut self, error: Error) {
+impl ::multipoll::Finisher<Error> for Reaper {
+    fn task_failed(&mut self, error: Error) {
         println!("IdentityMap task failed: {}", error);
     }
 }
@@ -60,7 +60,7 @@ struct IdentityMapInner {
     directory: ::std::path::PathBuf,
     trash_directory: ::std::path::PathBuf,
     api: sandstorm_api::Client<::capnp::any_pointer::Owned>,
-    tasks: ::multipoll::PollerHandle<(), Error>,
+    tasks: ::multipoll::PollerHandle<Error>,
 }
 
 impl IdentityMapInner {
@@ -76,8 +76,9 @@ impl IdentityMapInner {
         let mut req = inner.borrow().api.restore_request();
         req.get().set_token(&sturdyref[..]);
 
-        Promise::from_future(req.send().promise.and_then(move |response| {
-            response.get()?.get_cap().get_as_capability()
+        Promise::from_future(req.send().promise.map(move |r| match r {
+            Ok(response) => response.get()?.get_cap().get_as_capability(),
+            Err(e) => Err(e),
         }))
     }
 
@@ -91,27 +92,30 @@ impl IdentityMapInner {
        symlink.push(&truncated_text_id);
 
        let inner1 = inner.clone();
-       inner.borrow_mut().tasks.add(req.send().promise.and_then(move |result| {
-           // We save the token as a symlink, which ext4 can store (up to 60 bytes)
-           // directly in the inode, avoiding the need to allocate a block.
-           //
-           // Tokens are primarily text but can contain arbitrary bytes.
-           // We percent-encode to be safe and to keep the length of the encoded
-           // token under 60 bytes in the common case.
+       inner.borrow_mut().tasks.add(req.send().promise.map(move |r| match r {
+           Ok(result) => {
+               // We save the token as a symlink, which ext4 can store (up to 60 bytes)
+               // directly in the inode, avoiding the need to allocate a block.
+               //
+               // Tokens are primarily text but can contain arbitrary bytes.
+               // We percent-encode to be safe and to keep the length of the encoded
+               // token under 60 bytes in the common case.
 
-           let token = result.get()?.get_token()?;
-           let encoded_token = percent_encoding::percent_encode(
-               token,
-               percent_encoding::DEFAULT_ENCODE_SET
-           ).collect::<String>();
+               let token = result.get()?.get_token()?;
+               let encoded_token = percent_encoding::percent_encode(
+                   token,
+                   percent_encoding::DEFAULT_ENCODE_SET
+               ).collect::<String>();
 
-           IdentityMapInner::drop_identity(&inner1, &symlink)?;
+               IdentityMapInner::drop_identity(&inner1, &symlink)?;
 
-           ::std::os::unix::fs::symlink(encoded_token, symlink)?;
-           // TODO fsync?
+               ::std::os::unix::fs::symlink(encoded_token, symlink)?;
+               // TODO fsync?
 
-            Ok(())
-        }));
+               Ok(())
+           }
+           Err(e) => Err(e),
+       }));
    }
 
     fn drop_identity<P>(inner: &Rc<RefCell<IdentityMapInner>>,
@@ -128,12 +132,14 @@ impl IdentityMapInner {
                 let mut req = inner.borrow().api.drop_request();
                 let sturdyref = read_sturdyref_symlink(pointed_to)?;
                 req.get().set_token(&sturdyref[..]);
-                inner.borrow_mut().tasks.add(req.send().promise.and_then(move |_| {
-                    ::std::fs::remove_file(trash_file)?;
-                    // TODO fsync?
-                    Ok(())
+                inner.borrow_mut().tasks.add(req.send().promise.map(move |r| match r {
+                    Ok(_) => {
+                        ::std::fs::remove_file(trash_file)?;
+                        // TODO fsync?
+                        Ok(())
+                    }
+                    Err(e) => Err(e),
                 }));
-
 
                 Ok(())
             }
@@ -150,8 +156,7 @@ pub struct IdentityMap {
 impl IdentityMap {
     pub fn new<P, Q>(directory: P,
                      trash_directory: Q,
-                     api: &sandstorm_api::Client<::capnp::any_pointer::Owned>,
-                     handle: &::tokio_core::reactor::Handle)
+                     api: &sandstorm_api::Client<::capnp::any_pointer::Owned>)
                      -> Result<IdentityMap, Error>
         where P: AsRef<::std::path::Path>,
               Q: AsRef<::std::path::Path>,
@@ -160,8 +165,8 @@ impl IdentityMap {
         ::std::fs::create_dir_all(&directory)?;
         ::std::fs::create_dir_all(&trash_directory)?;
 
-        let (tx, poller) = ::multipoll::Poller::new(Reaper);
-        handle.spawn(poller.map_err(|_|()));
+        let (tx, poller) = ::multipoll::Poller::new(Box::new(Reaper));
+        tokio::task::spawn_local(poller.map_err(|_|()));
 
         Ok(IdentityMap {
             inner: Rc::new(RefCell::new(IdentityMapInner {
@@ -208,7 +213,7 @@ impl IdentityMap {
                     }
 
                     e
-                }).map(|_| ()));
+                }).map_ok(|_| ()));
 
                 Ok(())
             }

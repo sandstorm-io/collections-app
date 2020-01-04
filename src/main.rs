@@ -19,15 +19,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-extern crate futures;
-extern crate tokio_core;
-extern crate mio_uds;
-extern crate capnp;
 #[macro_use] extern crate capnp_rpc;
-extern crate rustc_serialize;
-extern crate sandstorm;
-extern crate url;
-extern crate multipoll;
 
 pub mod collections_capnp {
   include!(concat!(env!("OUT_DIR"), "/collections_capnp.rs"));
