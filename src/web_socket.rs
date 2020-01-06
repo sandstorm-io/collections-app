@@ -99,10 +99,10 @@ pub trait MessageHandler {
     fn handle_message(&mut self, message: Message) -> Promise<(), Error>;
 }
 
-fn do_ping_pong(client_stream: web_socket_stream::Client,
-                awaiting_pong: Rc<Cell<bool>>) -> Promise<(), Error>
+async fn do_ping_pong(client_stream: web_socket_stream::Client,
+                awaiting_pong: Rc<Cell<bool>>) -> Result<(), Error>
 {
-    Promise::from_future(async move {
+    loop {
         let mut req = client_stream.send_bytes_request();
         req.get().set_message(&[0x89, 0]); // PING
         let promise = req.send().promise;
@@ -110,11 +110,9 @@ fn do_ping_pong(client_stream: web_socket_stream::Client,
         let _ = promise.await?;
         let () =  tokio::time::delay_for(::std::time::Duration::new(10, 0)).await;
         if awaiting_pong.get() {
-            Err(Error::failed("pong not received within 10 seconds".into()))
-        } else {
-            do_ping_pong(client_stream, awaiting_pong).await
+            return Err(Error::failed("pong not received within 10 seconds".into()))
         }
-    })
+    }
 }
 
 enum PreviousFrames {
@@ -289,7 +287,7 @@ impl <T> Adapter<T> where T: MessageHandler {
                mut task_handle: ::multipoll::PollerHandle<Error>)
                -> Adapter<T> {
         let awaiting = Rc::new(Cell::new(false));
-        let ping_pong_promise = Promise::from_future(eagerly_evaluate(&mut task_handle, do_ping_pong(
+        let ping_pong_promise = Promise::from_future(eagerly_evaluate(&mut task_handle, Box::pin(do_ping_pong(
             client_stream.clone(),
             awaiting.clone()
         ).map(|r| match r {
@@ -298,7 +296,7 @@ impl <T> Adapter<T> where T: MessageHandler {
                 println!("error while pinging client: {}", e);
                 Ok(())
             }
-        })).map_ok(|_| ()).map_err(|e| e.into()));
+        }))).map_ok(|_| ()).map_err(|e| e.into()));
 
         Adapter {
             handler: Some(handler),
