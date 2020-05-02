@@ -558,12 +558,11 @@ impl SavedUiViewSet {
             self.inner.borrow_mut().tasks.add(task);
         }
 
-
-        web_socket_stream::ToClient::new(
+        capnp_rpc::new_client(
             web_socket::Adapter::new(
                 WebSocketStream::new(id, self.clone()),
                 client_stream,
-                self.inner.borrow().tasks.clone())).into_client::<::capnp_rpc::Server>()
+                self.inner.borrow().tasks.clone()))
     }
 }
 
@@ -1073,8 +1072,7 @@ impl ui_view::Server for UiView {
             pry!(params.get_session_params().get_as()),
             self.sandstorm_api.clone(),
             self.saved_ui_views.clone()));
-        let client: web_session::Client =
-            web_session::ToClient::new(session).into_client::<::capnp_rpc::Server>();
+        let client: web_session::Client = capnp_rpc::new_client(session);
 
         // We need to do this silly dance to upcast.
         results.get().set_session(ui_session::Client { client : client.client});
@@ -1126,8 +1124,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
             sandstorm_api,
             saved_uiviews);
 
-        let client = ui_view::ToClient::new(uiview).into_client::<::capnp_rpc::Server>();
-
+        let client: ui_view::Client = capnp_rpc::new_client(uiview);
         let mut rpc_system = RpcSystem::new(network, Some(client.client));
 
         let _ = tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
