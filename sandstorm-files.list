@@ -9,16 +9,11 @@ proc/cpuinfo
 sandstorm-manifest
 script.js.gz
 style.css.gz
-usr/lib/ld-2.27.so
 usr/lib/ld-linux-x86-64.so.2
-usr/lib/libc-2.27.so
 usr/lib/libc.so.6
-usr/lib/libdl-2.27.so
 usr/lib/libdl.so.2
 usr/lib/libgcc_s.so.1
-usr/lib/libpthread-2.27.so
 usr/lib/libpthread.so.0
-usr/lib/librt-2.27.so
 usr/lib/librt.so.1
 usr/lib64/ld-linux-x86-64.so.2
 usr/lib64/libc.so.6
