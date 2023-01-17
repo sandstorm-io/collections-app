@@ -821,7 +821,7 @@ impl WebSession {
                     use capnp::traits::HasTypeId;
                     let tags = req.get().init_descriptor().init_tags(1);
                     let mut tag = tags.get(0);
-                    tag.set_id(ui_view::Client::type_id());
+                    tag.set_id(ui_view::Client::TYPE_ID);
                     let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
                     value.set_title(&title);
                 }
@@ -1060,7 +1060,7 @@ impl ui_view::Server for UiView {
         use ::capnp::traits::HasTypeId;
         let params = pry!(params.get());
 
-        if params.get_session_type() != web_session::Client::type_id() {
+        if params.get_session_type() != web_session::Client::TYPE_ID {
             return Promise::err(Error::failed("unsupported session type".to_string()));
         }
 
