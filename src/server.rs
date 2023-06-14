@@ -23,7 +23,7 @@ use multipoll::{Finisher, Poller, PollerHandle};
 use capnp::Error;
 use capnp::capability::Promise;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{base64, hex, json};
+use rustc_serialize::{base64, json};
 
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
@@ -589,9 +589,8 @@ impl WebSession {
         // Permission #0 is "write". Check if bit 0 in the PermissionSet is set.
         let permissions = user_info.get_permissions()?;
         let can_write = permissions.len() > 0 && permissions.get(0);
-
         let identity_id = if user_info.has_identity_id() {
-            Some(hex::ToHex::to_hex(user_info.get_identity_id()?))
+            Some(::hex::encode(user_info.get_identity_id()?))
         } else {
             None
         };
