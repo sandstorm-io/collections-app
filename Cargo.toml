@@ -11,16 +11,16 @@ name = "server"
 path = "src/main.rs"
 
 [build-dependencies]
-capnpc = "0.17"
+capnpc = "0.18"
 
 [dependencies]
 futures = "0.3.28"
-capnp = "0.17"
-capnp-rpc = "0.17"
+capnp = "0.18"
+capnp-rpc = "0.18"
 rustc-serialize = "0.3.19"
 hex = "0.4.3"
 url = "1.2"
-sandstorm = "0.0.18"
+sandstorm = "0.0.19"
 tokio = { version = "0.2.6", features = ["net", "rt-util", "time", "uds"]}
 tokio-util = { version = "0.3.0", features = ["compat"] }
 multipoll = { git = "https://github.com/dwrensha/multipoll" }

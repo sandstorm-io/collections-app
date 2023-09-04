@@ -189,7 +189,7 @@ fn url_of_static_asset(asset: static_asset::Client) -> Promise<String, Error> {
                     static_asset::Protocol::Http => "http".to_string(),
                 };
 
-                Ok(format!("{}://{}", protocol, result.get_host_path()?))
+                Ok(format!("{}://{}", protocol, result.get_host_path()?.to_str()?))
             }
             Err(e) => Err(e),
         }
@@ -312,13 +312,13 @@ impl SavedUiViewSet {
                 let metadata: ui_view_metadata::Reader = message.get_root()?;
 
                 let added_by = if metadata.has_added_by() {
-                    Some(metadata.get_added_by()?.into())
+                    Some(metadata.get_added_by()?.to_string()?)
                 } else {
                     None
                 };
 
                 let entry = SavedUiViewData {
-                    title: metadata.get_title()?.into(),
+                    title: metadata.get_title()?.to_string()?,
                     date_added: metadata.get_date_added(),
                     added_by: added_by,
                 };
@@ -350,7 +350,7 @@ impl SavedUiViewSet {
                 pry!(pry!(response.get()).get_cap().get_as_capability());
             Promise::from_future(view.get_view_info_request().send().promise.and_then(move |response| {
                 let view_info = pry!(response.get());
-                let app_title = pry!(pry!(view_info.get_app_title()).get_default_text()).to_string();
+                let app_title = pry!(pry!(pry!(view_info.get_app_title()).get_default_text()).to_string());
                 Promise::from_future(url_of_static_asset(pry!(view_info.get_grain_icon())).map_ok(move |url| {
                     ViewInfoData {
                         app_title: app_title,
@@ -378,7 +378,7 @@ impl SavedUiViewSet {
             identity.get_profile_request().send().promise
         }).and_then(move |response| {
             let profile = pry!(pry!(response.get()).get_profile());
-            let display_name = pry!(pry!(profile.get_display_name()).get_default_text()).to_string();
+            let display_name = pry!(pry!(pry!(profile.get_display_name()).get_default_text()).to_string());
             Promise::from_future(url_of_static_asset(pry!(profile.get_picture())).map_ok(move |url| {
                 ProfileData { display_name: display_name, picture_url: url }
             }))
@@ -423,10 +423,10 @@ impl SavedUiViewSet {
         let mut message = ::capnp::message::Builder::new_default();
         {
             let mut metadata: ui_view_metadata::Builder = message.init_root();
-            metadata.set_title(&title);
+            metadata.set_title(title[..].into());
             metadata.set_date_added(date_added);
             match added_by {
-                Some(ref s) => metadata.set_added_by(s),
+                Some(ref s) => metadata.set_added_by(s[..].into()),
                 None => (),
             }
         }
@@ -628,7 +628,7 @@ impl web_session::Server for WebSession {
 	-> Promise<(), Error>
     {
         // HTTP GET request.
-        let path = pry!(pry!(params.get()).get_path());
+        let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
         pry!(self.require_canonical_path(path));
 
         if path == "" {
@@ -638,7 +638,7 @@ impl web_session::Server for WebSession {
                        <script type=\"text/javascript\" src=\"script.js\" async></script>
                        </head><body><div id=\"main\"></div></body></html>";
             let mut content = results.get().init_content();
-            content.set_mime_type("text/html; charset=UTF-8");
+            content.set_mime_type("text/html; charset=UTF-8".into());
             content.init_body().set_bytes(text.as_bytes());
             Promise::ok(())
         } else if path == "script.js" {
@@ -658,7 +658,7 @@ impl web_session::Server for WebSession {
             -> Promise<(), Error>
     {
         let path = {
-            let path = pry!(pry!(params.get()).get_path());
+            let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
             pry!(self.require_canonical_path(path));
             path.to_string()
         };
@@ -704,7 +704,7 @@ impl web_session::Server for WebSession {
         // HTTP PUT request.
 
         let params = pry!(params.get());
-        let path = pry!(params.get_path());
+        let path = pry!(pry!(params.get_path()).to_str());
         pry!(self.require_canonical_path(path));
 
         if !self.can_write {
@@ -733,7 +733,7 @@ impl web_session::Server for WebSession {
     {
         // HTTP DELETE request.
 
-        let path = pry!(pry!(params.get()).get_path());
+        let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
         pry!(self.require_canonical_path(path));
 
         if !path.starts_with("sturdyref/") {
@@ -749,7 +749,7 @@ impl web_session::Server for WebSession {
             let binary_token = match base64::FromBase64::from_base64(&token_string[..]) {
                 Ok(b) => b,
                 Err(e) => {
-                    results.get().init_client_error().set_description_html(&format!("{}", e)[..]);
+                    results.get().init_client_error().set_description_html(format!("{}", e)[..].into());
                     return Promise::ok(())
                 }
             };
@@ -790,7 +790,7 @@ impl web_session::Server for WebSession {
 fn fill_in_client_error(mut results: web_session::PostResults, e: Error)
 {
     let mut client_error = results.get().init_client_error();
-    client_error.set_description_html(&format!("{}", e)[..]);
+    client_error.set_description_html(format!("{}", e)[..].into());
 }
 
 impl WebSession {
@@ -822,7 +822,7 @@ impl WebSession {
                     let mut tag = tags.get(0);
                     tag.set_id(ui_view::Client::TYPE_ID);
                     let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
-                    value.set_title(&title);
+                    value.set_title(title[..].into());
                 }
 
                 Promise::from_future(req.send().promise.map_ok(|_| ()))
@@ -858,7 +858,7 @@ impl WebSession {
             Err(Error::failed("no powerbox tag".into()))
         } else {
             let value: ui_view::powerbox_tag::Reader = tags.get(0).get_value().get_as()?;
-            Ok(value.get_title()?.into())
+            Ok(value.get_title()?.to_string()?)
         }
     }
 
@@ -888,7 +888,7 @@ impl WebSession {
         // now let's save this thing into an actual uiview sturdyref
         let mut req = self.context.claim_request_request();
         let sandstorm_api = self.sandstorm_api.clone();
-        req.get().set_request_token(&token[..]);
+        req.get().set_request_token(token[..].into());
         let mut saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
 
@@ -899,7 +899,7 @@ impl WebSession {
             req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
             {
                 let mut save_label = req.get().init_label();
-                save_label.set_default_text(&format!("grain with title: {}", grain_title)[..]);
+                save_label.set_default_text(format!("grain with title: {}", grain_title)[..].into());
             }
             Promise::from_future(req.send().promise.map(move |r| {
                 let response = r?;
@@ -925,7 +925,7 @@ impl WebSession {
             }
             Err(e) => {
                 let mut error = results.get().init_client_error();
-                error.set_description_html(&format!("error: {:?}", e));
+                error.set_description_html(format!("error: {:?}", e)[..].into());
                 Promise::ok(())
             }
         }))
@@ -958,8 +958,8 @@ impl WebSession {
                 let size = pry!(f.metadata()).len();
                 let mut content = results.get().init_content();
                 content.set_status_code(web_session::response::SuccessCode::Ok);
-                content.set_mime_type(content_type);
-                encoding.map(|enc| content.set_encoding(enc));
+                content.set_mime_type(content_type.into());
+                encoding.map(|enc| content.set_encoding(enc.into()));
 
                 let mut body = content.init_body().init_bytes(size as u32);
                 pry!(::std::io::copy(&mut f, &mut body));
@@ -1007,23 +1007,23 @@ impl ui_view::Server for UiView {
         {
             let perms = view_info.reborrow().init_permissions(1);
             let mut write = perms.get(0);
-            write.set_name("write");
-            write.init_title().set_default_text("write");
+            write.set_name("write".into());
+            write.init_title().set_default_text("write".into());
         }
 
         {
             let mut roles = view_info.reborrow().init_roles(2);
             {
                 let mut editor = roles.reborrow().get(0);
-                editor.reborrow().init_title().set_default_text("editor");
-                editor.reborrow().init_verb_phrase().set_default_text("can edit");
+                editor.reborrow().init_title().set_default_text("editor".into());
+                editor.reborrow().init_verb_phrase().set_default_text("can edit".into());
                 editor.init_permissions(1).set(0, true);   // has "write" permission
             }
             {
                 let mut viewer = roles.get(1);
                 viewer.set_default(true);
-                viewer.reborrow().init_title().set_default_text("viewer");
-                viewer.reborrow().init_verb_phrase().set_default_text("can view");
+                viewer.reborrow().init_title().set_default_text("viewer".into());
+                viewer.reborrow().init_verb_phrase().set_default_text("can view".into());
                 viewer.init_permissions(1).set(0, false);  // does not have "write" permission
             }
         }
@@ -1032,18 +1032,18 @@ impl ui_view::Server for UiView {
             let mut event_types = view_info.init_event_types(3);
             {
                 let mut added = event_types.reborrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
-                added.set_name("add");
-                added.reborrow().init_verb_phrase().set_default_text("added grain");
+                added.set_name("add".into());
+                added.reborrow().init_verb_phrase().set_default_text("added grain".into());
             }
             {
                 let mut removed = event_types.reborrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
-                removed.set_name("remove");
-                removed.reborrow().init_verb_phrase().set_default_text("removed grain");
+                removed.set_name("remove".into());
+                removed.reborrow().init_verb_phrase().set_default_text("removed grain".into());
             }
             {
                 let mut removed = event_types.reborrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
-                removed.set_name("description");
-                removed.reborrow().init_verb_phrase().set_default_text("edited description");
+                removed.set_name("description".into());
+                removed.reborrow().init_verb_phrase().set_default_text("edited description".into());
             }
         }
 
