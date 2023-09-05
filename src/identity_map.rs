@@ -23,7 +23,6 @@ use capnp::capability::Promise;
 use capnp::Error;
 use futures::{FutureExt, TryFutureExt};
 use url::percent_encoding;
-use rustc_serialize::{hex};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -179,7 +178,7 @@ impl IdentityMap {
     }
 
     pub fn put(&mut self, id: &[u8], identity: identity::Client) -> Result<(), Error> {
-        let text_id = hex::ToHex::to_hex(id);
+        let text_id = ::hex::encode(id);
         self.put_by_text(&text_id, identity)
     }
 
@@ -228,7 +227,7 @@ impl IdentityMap {
             return Promise::err(Error::failed(format!("invalid identity ID {:?}", id)))
         }
 
-        let text_id = hex::ToHex::to_hex(&id[..16]);
+        let text_id = ::hex::encode(&id[..16]);
         self.get_by_text(&text_id)
     }
 

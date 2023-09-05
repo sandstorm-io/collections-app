@@ -23,7 +23,6 @@ use multipoll::{Finisher, Poller, PollerHandle};
 use capnp::Error;
 use capnp::capability::Promise;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{json};
 use base64::{self, Engine};
 
 use std::collections::hash_map::HashMap;
@@ -86,17 +85,86 @@ struct SavedUiViewData {
     added_by: Option<String>,
 }
 
+// copied from rustc_serialize
+fn json_escape_str(v: &str) -> String {
+    let mut result: String = "\"".into();
+
+    let mut start = 0;
+
+    for (i, byte) in v.bytes().enumerate() {
+        let escaped = match byte {
+            b'\"' => "\\\"",
+            b'\\' => "\\\\",
+            b'\x00' => "\\u0000",
+            b'\x01' => "\\u0001",
+            b'\x02' => "\\u0002",
+            b'\x03' => "\\u0003",
+            b'\x04' => "\\u0004",
+            b'\x05' => "\\u0005",
+            b'\x06' => "\\u0006",
+            b'\x07' => "\\u0007",
+            b'\x08' => "\\b",
+            b'\t' => "\\t",
+            b'\n' => "\\n",
+            b'\x0b' => "\\u000b",
+            b'\x0c' => "\\f",
+            b'\r' => "\\r",
+            b'\x0e' => "\\u000e",
+            b'\x0f' => "\\u000f",
+            b'\x10' => "\\u0010",
+            b'\x11' => "\\u0011",
+            b'\x12' => "\\u0012",
+            b'\x13' => "\\u0013",
+            b'\x14' => "\\u0014",
+            b'\x15' => "\\u0015",
+            b'\x16' => "\\u0016",
+            b'\x17' => "\\u0017",
+            b'\x18' => "\\u0018",
+            b'\x19' => "\\u0019",
+            b'\x1a' => "\\u001a",
+            b'\x1b' => "\\u001b",
+            b'\x1c' => "\\u001c",
+            b'\x1d' => "\\u001d",
+            b'\x1e' => "\\u001e",
+            b'\x1f' => "\\u001f",
+            b'\x7f' => "\\u007f",
+            _ => { continue; }
+        };
+
+        if start < i {
+            result.push_str(&v[start..i]);
+        }
+
+        result.push_str(escaped);
+
+        start = i + 1;
+    }
+
+    if start != v.len() {
+        result.push_str(&v[start..]);
+    }
+
+    result.push_str("\"");
+    result
+}
+
+#[test]
+fn test_json_escape_string() {
+    assert_eq!(json_escape_str("hello"), "\"hello\"");
+    assert_eq!(json_escape_str("he\"\"llo"), "\"he\\\"\\\"llo\"");
+}
+
 fn optional_string_to_json(optional_string: &Option<String>) -> String {
     match optional_string {
         &None => "null".into(),
-        &Some(ref s) => format!("{}", json::ToJson::to_json(s)),
+        &Some(ref s) => format!("{}", json_escape_str(s)),
     }
 }
 
 impl SavedUiViewData {
     fn to_json(&self) -> String {
         format!("{{\"title\":{},\"dateAdded\": \"{}\",\"addedBy\":{}}}",
-                json::ToJson::to_json(&self.title),
+                json_escape_str(&self.title),
                 self.date_added,
                 optional_string_to_json(&self.added_by))
     }
@@ -111,7 +179,7 @@ struct ViewInfoData {
 impl ViewInfoData {
     fn to_json(&self) -> String {
         format!("{{\"appTitle\":{},\"grainIconUrl\":\"{}\"}}",
-                json::ToJson::to_json(&self.app_title),
+                json_escape_str(&self.app_title),
                 self.grain_icon_url)
     }
 }
@@ -126,8 +194,8 @@ impl ProfileData {
     fn to_json(&self) -> String {
         format!(
             "{{\"pictureUrl\":{}, \"displayName\":{}}}",
-            json::ToJson::to_json(&self.picture_url),
-            json::ToJson::to_json(&self.display_name))
+            json_escape_str(&self.picture_url),
+            json_escape_str(&self.display_name))
     }
 }
 
@@ -159,7 +227,7 @@ impl Action {
             &Action::ViewInfo { ref token, data: Err(ref e) } => {
                 format!("{{\"viewInfo\":{{\"token\":\"{}\",\"failed\": {} }} }}",
                         token,
-                        json::ToJson::to_json(&format!("{}", e)))
+                        json_escape_str(&format!("{}", e)))
             }
 
             &Action::CanWrite(b) => {
@@ -169,12 +237,12 @@ impl Action {
                 format!("{{\"userId\":{}}}", optional_string_to_json(s))
             }
             &Action::Description(ref s) => {
-                format!("{{\"description\":{}}}", json::ToJson::to_json(s))
+                format!("{{\"description\":{}}}", json_escape_str(s))
             }
             &Action::User { ref id, ref data } => {
                 format!(
                     "{{\"user\":{{\"id\":{}, \"data\":{} }}}}",
-                    json::ToJson::to_json(id), data.to_json())
+                    json_escape_str(id), data.to_json())
             }
         }
     }
