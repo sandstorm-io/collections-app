@@ -23,7 +23,8 @@ use multipoll::{Finisher, Poller, PollerHandle};
 use capnp::Error;
 use capnp::capability::Promise;
 use capnp_rpc::{RpcSystem, twoparty, rpc_twoparty_capnp};
-use rustc_serialize::{base64, json};
+use rustc_serialize::{json};
+use base64::{self, Engine};
 
 use std::collections::hash_map::HashMap;
 use std::collections::hash_set::HashSet;
@@ -338,7 +339,7 @@ impl SavedUiViewSet {
         // then call get_url() on the grain static asset.
 
         let mut self1 = self.clone();
-        let binary_token = match base64::FromBase64::from_base64(&token[..]) {
+        let binary_token = match base64::engine::general_purpose::URL_SAFE.decode(&token[..]) {
             Ok(b) => b,
             Err(e) => return Err(Error::failed(format!("{}", e))),
         };
@@ -746,7 +747,7 @@ impl web_session::Server for WebSession {
             Promise::ok(())
         } else {
             let token_string = path[10..].to_string();
-            let binary_token = match base64::FromBase64::from_base64(&token_string[..]) {
+            let binary_token = match base64::engine::general_purpose::URL_SAFE.decode(&token_string[..]) {
                 Ok(b) => b,
                 Err(e) => {
                     results.get().init_client_error().set_description_html(format!("{}", e)[..].into());
@@ -801,7 +802,7 @@ impl WebSession {
                      mut results: web_session::PostResults)
                      -> Promise<(), Error>
     {
-        let token = match base64::FromBase64::from_base64(&text_token[..]) {
+        let token = match base64::engine::general_purpose::URL_SAFE.decode(&text_token[..]) {
             Ok(b) => b,
             Err(e) => return Promise::err(Error::failed(format!("{}", e))),
         };
@@ -870,7 +871,7 @@ impl WebSession {
     {
         let content = pry!(pry!(pry!(params.get()).get_content()).get_content());
 
-        let decoded_content = match base64::FromBase64::from_base64(content) {
+        let decoded_content = match base64::engine::general_purpose::URL_SAFE.decode(content) {
             Ok(c) => c,
             Err(_) => {
                 fill_in_client_error(results, Error::failed("failed to convert from base64".into()));
@@ -904,7 +905,7 @@ impl WebSession {
             Promise::from_future(req.send().promise.map(move |r| {
                 let response = r?;
                 let binary_token = response.get()?.get_token()?;
-                let token = base64::ToBase64::to_base64(binary_token, base64::URL_SAFE);
+                let token = base64::engine::general_purpose::URL_SAFE.encode(binary_token);
 
                 saved_ui_views.insert(token.clone(), grain_title, identity_id)?;
 
