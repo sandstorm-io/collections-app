@@ -20,7 +20,7 @@ capnp-rpc = "0.18"
 hex = "0.4.3"
 base64 = "0.21.3"
 url = "1.2"
-sandstorm = "0.0.19"
+sandstorm = "0.18.0"
 tokio = { version = "0.2.6", features = ["net", "rt-util", "time", "uds"]}
 tokio-util = { version = "0.3.0", features = ["compat"] }
 multipoll = { git = "https://github.com/dwrensha/multipoll" }
