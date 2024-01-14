@@ -492,10 +492,10 @@ impl SavedUiViewSet {
         let mut message = ::capnp::message::Builder::new_default();
         {
             let mut metadata: ui_view_metadata::Builder = message.init_root();
-            metadata.set_title(title[..].into());
+            metadata.set_title(&title);
             metadata.set_date_added(date_added);
             match added_by {
-                Some(ref s) => metadata.set_added_by(s[..].into()),
+                Some(ref s) => metadata.set_added_by(s),
                 None => (),
             }
         }
@@ -707,7 +707,7 @@ impl web_session::Server for WebSession {
                        <script type=\"text/javascript\" src=\"script.js\" async></script>
                        </head><body><div id=\"main\"></div></body></html>";
             let mut content = results.get().init_content();
-            content.set_mime_type("text/html; charset=UTF-8".into());
+            content.set_mime_type("text/html; charset=UTF-8");
             content.init_body().set_bytes(text.as_bytes());
             Promise::ok(())
         } else if path == "script.js" {
@@ -818,7 +818,7 @@ impl web_session::Server for WebSession {
             let binary_token = match base64::engine::general_purpose::URL_SAFE.decode(&token_string[..]) {
                 Ok(b) => b,
                 Err(e) => {
-                    results.get().init_client_error().set_description_html(format!("{}", e)[..].into());
+                    results.get().init_client_error().set_description_html(&format!("{}", e));
                     return Promise::ok(())
                 }
             };
@@ -859,7 +859,7 @@ impl web_session::Server for WebSession {
 fn fill_in_client_error(mut results: web_session::PostResults, e: Error)
 {
     let mut client_error = results.get().init_client_error();
-    client_error.set_description_html(format!("{}", e)[..].into());
+    client_error.set_description_html(&format!("{}", e));
 }
 
 impl WebSession {
@@ -891,7 +891,7 @@ impl WebSession {
                     let mut tag = tags.get(0);
                     tag.set_id(ui_view::Client::TYPE_ID);
                     let mut value: ui_view::powerbox_tag::Builder = tag.get_value().init_as();
-                    value.set_title(title[..].into());
+                    value.set_title(&title);
                 }
 
                 Promise::from_future(req.send().promise.map_ok(|_| ()))
@@ -957,7 +957,7 @@ impl WebSession {
         // now let's save this thing into an actual uiview sturdyref
         let mut req = self.context.claim_request_request();
         let sandstorm_api = self.sandstorm_api.clone();
-        req.get().set_request_token(token[..].into());
+        req.get().set_request_token(&token);
         let mut saved_ui_views = self.saved_ui_views.clone();
         let identity_id = self.identity_id.clone();
 
@@ -968,7 +968,7 @@ impl WebSession {
             req.get().get_cap().set_as_capability(sealed_ui_view.client.hook);
             {
                 let mut save_label = req.get().init_label();
-                save_label.set_default_text(format!("grain with title: {}", grain_title)[..].into());
+                save_label.set_default_text(&format!("grain with title: {}", grain_title));
             }
             Promise::from_future(req.send().promise.map(move |r| {
                 let response = r?;
@@ -994,7 +994,7 @@ impl WebSession {
             }
             Err(e) => {
                 let mut error = results.get().init_client_error();
-                error.set_description_html(format!("error: {:?}", e)[..].into());
+                error.set_description_html(&format!("error: {:?}", e));
                 Promise::ok(())
             }
         }))
@@ -1027,8 +1027,8 @@ impl WebSession {
                 let size = pry!(f.metadata()).len();
                 let mut content = results.get().init_content();
                 content.set_status_code(web_session::response::SuccessCode::Ok);
-                content.set_mime_type(content_type.into());
-                encoding.map(|enc| content.set_encoding(enc.into()));
+                content.set_mime_type(content_type);
+                encoding.map(|enc| content.set_encoding(enc));
 
                 let mut body = content.init_body().init_bytes(size as u32);
                 pry!(::std::io::copy(&mut f, &mut body));
@@ -1076,23 +1076,23 @@ impl ui_view::Server for UiView {
         {
             let perms = view_info.reborrow().init_permissions(1);
             let mut write = perms.get(0);
-            write.set_name("write".into());
-            write.init_title().set_default_text("write".into());
+            write.set_name("write");
+            write.init_title().set_default_text("write");
         }
 
         {
             let mut roles = view_info.reborrow().init_roles(2);
             {
                 let mut editor = roles.reborrow().get(0);
-                editor.reborrow().init_title().set_default_text("editor".into());
-                editor.reborrow().init_verb_phrase().set_default_text("can edit".into());
+                editor.reborrow().init_title().set_default_text("editor");
+                editor.reborrow().init_verb_phrase().set_default_text("can edit");
                 editor.init_permissions(1).set(0, true);   // has "write" permission
             }
             {
                 let mut viewer = roles.get(1);
                 viewer.set_default(true);
-                viewer.reborrow().init_title().set_default_text("viewer".into());
-                viewer.reborrow().init_verb_phrase().set_default_text("can view".into());
+                viewer.reborrow().init_title().set_default_text("viewer");
+                viewer.reborrow().init_verb_phrase().set_default_text("can view");
                 viewer.init_permissions(1).set(0, false);  // does not have "write" permission
             }
         }
@@ -1101,18 +1101,18 @@ impl ui_view::Server for UiView {
             let mut event_types = view_info.init_event_types(3);
             {
                 let mut added = event_types.reborrow().get(ADD_GRAIN_ACTIVITY_INDEX as u32);
-                added.set_name("add".into());
-                added.reborrow().init_verb_phrase().set_default_text("added grain".into());
+                added.set_name("add");
+                added.reborrow().init_verb_phrase().set_default_text("added grain");
             }
             {
                 let mut removed = event_types.reborrow().get(REMOVE_GRAIN_ACTIVITY_INDEX as u32);
-                removed.set_name("remove".into());
-                removed.reborrow().init_verb_phrase().set_default_text("removed grain".into());
+                removed.set_name("remove");
+                removed.reborrow().init_verb_phrase().set_default_text("removed grain");
             }
             {
                 let mut removed = event_types.reborrow().get(EDIT_DESCRIPTION_ACTIVITY_INDEX as u32);
-                removed.set_name("description".into());
-                removed.reborrow().init_verb_phrase().set_default_text("edited description".into());
+                removed.set_name("description");
+                removed.reborrow().init_verb_phrase().set_default_text("edited description");
             }
         }
 

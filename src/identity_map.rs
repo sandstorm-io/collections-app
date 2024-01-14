@@ -86,7 +86,7 @@ impl IdentityMapInner {
                    identity: identity::Client) {
        let mut req = inner.borrow().api.save_request();
        req.get().init_cap().set_as_capability(identity.client.hook);
-       req.get().init_label().set_default_text("user identity".into());
+       req.get().init_label().set_default_text("user identity");
        let mut symlink = inner.borrow().directory.clone();
        symlink.push(&truncated_text_id);
 
