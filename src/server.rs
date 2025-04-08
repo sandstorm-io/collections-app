@@ -1176,7 +1176,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let (tx, rx) = futures::channel::oneshot::channel();
         let sandstorm_api: sandstorm_api::Client<::capnp::any_pointer::Owned> =
-            ::capnp_rpc::new_promise_client(rx.map_err(|_e| capnp::Error::failed(format!("oneshot was canceled"))));
+            ::capnp_rpc::new_future_client(rx.map_err(|_e| capnp::Error::failed(format!("oneshot was canceled"))));
 
         let identity_map = IdentityMap::new(
             "/var/identities",
@@ -1196,7 +1196,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut rpc_system = RpcSystem::new(network, Some(client.client));
 
         let _ = tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
-            ::capnp_rpc::rpc_twoparty_capnp::Side::Server).client);
+            ::capnp_rpc::rpc_twoparty_capnp::Side::Server));
 
         Ok::<_,  Box<dyn (std::error::Error)>>(rpc_system.await?)
     })?;
