@@ -1198,7 +1198,7 @@ pub fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = tx.send(rpc_system.bootstrap::<sandstorm_api::Client<::capnp::any_pointer::Owned>>(
             ::capnp_rpc::rpc_twoparty_capnp::Side::Server));
 
-        Ok::<_,  Box<dyn (std::error::Error)>>(rpc_system.await?)
+        Ok::<_,  Box<dyn std::error::Error>>(rpc_system.await?)
     })?;
     Ok(())
 }
