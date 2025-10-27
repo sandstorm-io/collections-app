@@ -406,7 +406,7 @@ impl SavedUiViewSet {
         // SandstormApi.restore, then call getViewInfo,
         // then call get_url() on the grain static asset.
 
-        let mut self1 = self.clone();
+        let self1 = self.clone();
         let binary_token = match base64::engine::general_purpose::URL_SAFE.decode(&token[..]) {
             Ok(b) => b,
             Err(e) => return Err(Error::failed(format!("{}", e))),
@@ -441,7 +441,7 @@ impl SavedUiViewSet {
         Ok(())
     }
 
-    fn get_user_profile(&mut self,
+    fn get_user_profile(&self,
                         identity_id: &str) -> Promise<ProfileData, Error> {
         Promise::from_future(self.inner.borrow_mut().identity_map.get_by_text(identity_id).and_then(move |identity| {
             identity.get_profile_request().send().promise
@@ -454,7 +454,7 @@ impl SavedUiViewSet {
         }))
     }
 
-    fn update_description(&mut self, description: &[u8]) -> ::capnp::Result<()> {
+    fn update_description(&self, description: &[u8]) -> ::capnp::Result<()> {
         use std::io::Write;
 
         let desc_string: String = match ::std::str::from_utf8(description) {
@@ -506,7 +506,7 @@ impl SavedUiViewSet {
 
         if !self.inner.borrow().subscribers.is_empty() {
             if let Some(ref id) = added_by {
-                let mut self1 = self.clone();
+                let self1 = self.clone();
                 let identity_id: String = id.to_string();
                 let task = self.get_user_profile(&identity_id).map_ok(move |profile_data| {
                     self1.send_action_to_subscribers(
@@ -531,7 +531,7 @@ impl SavedUiViewSet {
         Ok(())
     }
 
-    fn send_action_to_subscribers(&mut self, action: Action) {
+    fn send_action_to_subscribers(&self, action: Action) {
         let json_string = action.to_json();
         let &mut SavedUiViewSetInner { ref subscribers, ref mut tasks, ..} =
             &mut *self.inner.borrow_mut();
@@ -556,7 +556,7 @@ impl SavedUiViewSet {
         Ok(())
     }
 
-    fn new_subscribed_websocket(&mut self,
+    fn new_subscribed_websocket(&self,
                                 client_stream: web_socket_stream::Client,
                                 can_write: bool,
                                 user_id: Option<String>)
@@ -691,14 +691,14 @@ impl WebSession {
 impl ui_session::Server for WebSession {}
 
 impl web_session::Server for WebSession {
-    fn get(&mut self,
+    async fn get(&self,
            params: web_session::GetParams,
            mut results: web_session::GetResults)
-	-> Promise<(), Error>
+	-> Result<(), Error>
     {
         // HTTP GET request.
-        let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
-        pry!(self.require_canonical_path(path));
+        let path = params.get()?.get_path()?.to_str()?;
+        self.require_canonical_path(path)?;
 
         if path == "" {
             let text = "<!DOCTYPE html>\
@@ -709,7 +709,7 @@ impl web_session::Server for WebSession {
             let mut content = results.get().init_content();
             content.set_mime_type("text/html; charset=UTF-8");
             content.init_body().set_bytes(text.as_bytes());
-            Promise::ok(())
+            Ok(())
         } else if path == "script.js" {
             self.read_file("/script.js.gz", results, "text/javascript; charset=UTF-8", Some("gzip"))
         } else if path == "style.css" {
@@ -717,36 +717,35 @@ impl web_session::Server for WebSession {
         } else {
             let mut error = results.get().init_client_error();
             error.set_status_code(web_session::response::ClientErrorCode::NotFound);
-            Promise::ok(())
+            Ok(())
         }
     }
 
-    fn post(&mut self,
+    async fn post(&self,
             params: web_session::PostParams,
             mut results: web_session::PostResults)
-            -> Promise<(), Error>
+            -> Result<(), Error>
     {
         let path = {
-            let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
-            pry!(self.require_canonical_path(path));
+            let path = params.get()?.get_path()?.to_str()?;
+            self.require_canonical_path(path)?;
             path.to_string()
         };
 
         if path.starts_with("token/") {
-            Promise::from_future(self.receive_request_token(path[6..].to_string(), params, results))
+            self.receive_request_token(path[6..].to_string(), params, results).await
         } else if path.starts_with("offer/") {
             let token = path[6..].to_string();
             let title = match self.saved_ui_views.inner.borrow().get_saved_data(&token) {
                 None => {
                     let mut error = results.get().init_client_error();
                     error.set_status_code(web_session::response::ClientErrorCode::NotFound);
-                    return Promise::ok(())
+                    return Ok(())
                 }
                 Some(saved_ui_view) => saved_ui_view.title.to_string(),
             };
 
-            self.offer_ui_view(token, title, params, results)
-
+            self.offer_ui_view(token, title, params, results).await
         } else if path.starts_with("refresh/") {
             let token = path[8..].to_string();
             match SavedUiViewSet::retrieve_view_info(&self.saved_ui_views, token) {
@@ -757,69 +756,69 @@ impl web_session::Server for WebSession {
                     fill_in_client_error(results, e);
                 }
             }
-            Promise::ok(())
+            Ok(())
         } else {
             let mut error = results.get().init_client_error();
             error.set_status_code(web_session::response::ClientErrorCode::NotFound);
-            Promise::ok(())
+            Ok(())
         }
     }
 
-    fn put(&mut self,
+    async fn put(&self,
            params: web_session::PutParams,
            mut results: web_session::PutResults)
-	-> Promise<(), Error>
+	-> Result<(), Error>
     {
         // HTTP PUT request.
 
-        let params = pry!(params.get());
-        let path = pry!(pry!(params.get_path()).to_str());
-        pry!(self.require_canonical_path(path));
+        let params = params.get()?;
+        let path = params.get_path()?.to_str()?;
+        self.require_canonical_path(path)?;
 
         if !self.can_write {
             results.get().init_client_error()
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
-            Promise::ok(())
+            Ok(())
         } else if path == "description" {
-            let content = pry!(pry!(params.get_content()).get_content());
-            pry!(self.saved_ui_views.update_description(content));
+            let content = params.get_content()?.get_content()?;
+            self.saved_ui_views.update_description(content)?;
             let mut req = self.context.activity_request();
             req.get().init_event().set_type(EDIT_DESCRIPTION_ACTIVITY_INDEX);
-            Promise::from_future(req.send().promise.map_ok(move |_| {
-                results.get().init_no_content();
-            }))
+            req.send().promise.await?;
+            results.get().init_no_content();
+            Ok(())
         } else {
             results.get().init_client_error()
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
-            Promise::ok(())
+            Ok(())
         }
     }
 
-    fn delete(&mut self,
-              params: web_session::DeleteParams,
-              mut results: web_session::DeleteResults)
-	-> Promise<(), Error>
+    async fn delete(&self,
+                    params: web_session::DeleteParams,
+                    mut results: web_session::DeleteResults)
+	-> Result<(), Error>
     {
         // HTTP DELETE request.
 
-        let path = pry!(pry!(pry!(params.get()).get_path()).to_str());
-        pry!(self.require_canonical_path(path));
+        let path = params.get()?.get_path()?.to_str()?;
+        self.require_canonical_path(path)?;
 
         if !path.starts_with("sturdyref/") {
-            return Promise::err(Error::failed("DELETE only supported under sturdyref/".to_string()));
+            return Err(Error::failed("DELETE only supported under sturdyref/".to_string()));
         }
 
         if !self.can_write {
             results.get().init_client_error()
                 .set_status_code(web_session::response::ClientErrorCode::Forbidden);
-            Promise::ok(())
+            Ok(())
         } else {
             let token_string = path[10..].to_string();
             let binary_token = match base64::engine::general_purpose::URL_SAFE.decode(&token_string[..]) {
                 Ok(b) => b,
                 Err(e) => {
                     results.get().init_client_error().set_description_html(&format!("{}", e));
-                    return Promise::ok(())
+                    return Ok(())
                 }
             };
 
@@ -827,24 +826,22 @@ impl web_session::Server for WebSession {
             let context = self.context.clone();
             let mut req = self.sandstorm_api.drop_request();
             req.get().set_token(&binary_token);
-            Promise::from_future(req.send().promise.and_then(move |_| {
-                pry!(saved_ui_views.remove(&token_string));
-                let mut req = context.activity_request();
-                req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
-                Promise::from_future(req.send().promise.and_then(move |_| {
-                    results.get().init_no_content();
-                    Promise::ok(())
-                }))
-            }))
+            req.send().promise.await?;
+            saved_ui_views.remove(&token_string)?;
+            let mut req = context.activity_request();
+            req.get().init_event().set_type(REMOVE_GRAIN_ACTIVITY_INDEX);
+            req.send().promise.await?;
+            results.get().init_no_content();
+            Ok(())
         }
     }
 
-    fn open_web_socket(&mut self,
-                     params: web_session::OpenWebSocketParams,
-                     mut results: web_session::OpenWebSocketResults)
-                     -> Promise<(), Error>
+    async fn open_web_socket(&self,
+                             params: web_session::OpenWebSocketParams,
+                             mut results: web_session::OpenWebSocketResults)
+                             -> Result<(), Error>
     {
-        let client_stream = pry!(pry!(params.get()).get_client_stream());
+        let client_stream = params.get()?.get_client_stream()?;
 
         results.get().set_server_stream(
             self.saved_ui_views.new_subscribed_websocket(
@@ -852,7 +849,7 @@ impl web_session::Server for WebSession {
                 self.can_write,
                 self.identity_id.clone()));
 
-        Promise::ok(())
+        Ok(())
     }
 }
 
@@ -863,7 +860,7 @@ fn fill_in_client_error(mut results: web_session::PostResults, e: Error)
 }
 
 impl WebSession {
-    fn offer_ui_view(&mut self,
+    fn offer_ui_view(&self,
                      text_token: String,
                      title: String,
                      _params: web_session::PostParams,
@@ -876,7 +873,7 @@ impl WebSession {
         };
 
         let session_context = self.context.clone();
-        let mut set = self.saved_ui_views.clone();
+        let set = self.saved_ui_views.clone();
         let mut req = self.sandstorm_api.restore_request();
         req.get().set_token(&token);
         Promise::from_future(req.send().promise.then(move |response| match response {
@@ -916,7 +913,7 @@ impl WebSession {
         }))
     }
 
-    fn read_powerbox_tag(&mut self, decoded_content: Vec<u8>) -> ::capnp::Result<String>
+    fn read_powerbox_tag(&self, decoded_content: Vec<u8>) -> ::capnp::Result<String>
     {
         let mut cursor = ::std::io::Cursor::new(decoded_content);
         let message = ::capnp::serialize_packed::read_message(&mut cursor,
@@ -931,7 +928,7 @@ impl WebSession {
         }
     }
 
-    fn receive_request_token(&mut self,
+    fn receive_request_token(&self,
                              token: String,
                              params: web_session::PostParams,
                              mut results: web_session::PostResults)
@@ -1020,27 +1017,27 @@ impl WebSession {
                  mut results: web_session::GetResults,
                  content_type: &str,
                  encoding: Option<&str>)
-                 -> Promise<(), Error>
+                 -> Result<(), Error>
     {
         match ::std::fs::File::open(filename) {
             Ok(mut f) => {
-                let size = pry!(f.metadata()).len();
+                let size = f.metadata()?.len();
                 let mut content = results.get().init_content();
                 content.set_status_code(web_session::response::SuccessCode::Ok);
                 content.set_mime_type(content_type);
                 encoding.map(|enc| content.set_encoding(enc));
 
                 let mut body = content.init_body().init_bytes(size as u32);
-                pry!(::std::io::copy(&mut f, &mut body));
-                Promise::ok(())
+                ::std::io::copy(&mut f, &mut body)?;
+                Ok(())
             }
             Err(ref e) if e.kind() == ::std::io::ErrorKind::NotFound => {
                 let mut error = results.get().init_client_error();
                 error.set_status_code(web_session::response::ClientErrorCode::NotFound);
-                Promise::ok(())
+                Ok(())
             }
             Err(e) => {
-                Promise::err(e.into())
+                Err(e.into())
             }
         }
     }
@@ -1064,10 +1061,10 @@ impl UiView {
 }
 
 impl ui_view::Server for UiView {
-    fn get_view_info(&mut self,
+    async fn get_view_info(&self,
                      _params: ui_view::GetViewInfoParams,
                      mut results: ui_view::GetViewInfoResults)
-                     -> Promise<(), Error>
+                     -> Result<(), Error>
     {
         let mut view_info = results.get();
 
@@ -1116,43 +1113,43 @@ impl ui_view::Server for UiView {
             }
         }
 
-        Promise::ok(())
+        Ok(())
     }
 
 
-    fn new_session(&mut self,
+    async fn new_session(&self,
                    params: ui_view::NewSessionParams,
                    mut results: ui_view::NewSessionResults)
-                   -> Promise<(), Error>
+                   -> Result<(), Error>
     {
         use ::capnp::traits::HasTypeId;
-        let params = pry!(params.get());
+        let params = params.get()?;
 
         if params.get_session_type() != web_session::Client::TYPE_ID {
-            return Promise::err(Error::failed("unsupported session type".to_string()));
+            return Err(Error::failed("unsupported session type".to_string()));
         }
 
-        let user_info = pry!(params.get_user_info());
+        let user_info = params.get_user_info()?;
 
-        let session = pry!(WebSession::new(
+        let session = WebSession::new(
             user_info.clone(),
-            pry!(params.get_context()),
-            pry!(params.get_session_params().get_as()),
+            params.get_context()?,
+            params.get_session_params().get_as()?,
             self.sandstorm_api.clone(),
-            self.saved_ui_views.clone()));
+            self.saved_ui_views.clone())?;
         let client: web_session::Client = capnp_rpc::new_client(session);
 
         // We need to do this silly dance to upcast.
         results.get().set_session(ui_session::Client { client : client.client});
 
         if user_info.has_identity_id() {
-            let identity = pry!(user_info.get_identity());
+            let identity = user_info.get_identity()?;
 
             // TODO(cleanup)
-            pry!(self.saved_ui_views.inner.borrow_mut().identity_map.put(pry!(user_info.get_identity_id()), identity));
+            self.saved_ui_views.inner.borrow_mut().identity_map.put(user_info.get_identity_id()?, identity)?;
         }
 
-        Promise::ok(())
+        Ok(())
     }
 }
 

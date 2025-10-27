@@ -21,7 +21,7 @@
 
 use capnp::capability::Promise;
 use capnp::Error;
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::pin::Pin;
 use std::rc::Rc;
 use sandstorm::web_session_capnp::web_session::web_socket_stream;
@@ -272,13 +272,17 @@ impl ParserState {
     }
 }
 
-pub struct Adapter<T> where T: MessageHandler {
+pub struct AdapterInner<T> where T: MessageHandler {
     handler: Option<T>,
     awaiting_pong: Rc<Cell<bool>>,
     ping_pong_promise: Promise<(), Error>,
     client_stream: Option<web_socket_stream::Client>,
     parser_state: ParserState,
     previous_frames: PreviousFrames,
+}
+
+pub struct Adapter<T> where T: MessageHandler {
+    inner: RefCell<AdapterInner<T>>,
 }
 
 impl <T> Adapter<T> where T: MessageHandler {
@@ -299,17 +303,20 @@ impl <T> Adapter<T> where T: MessageHandler {
         }))).map_ok(|_| ()).map_err(|e| e.into()));
 
         Adapter {
-            handler: Some(handler),
-            awaiting_pong: awaiting,
-            ping_pong_promise: ping_pong_promise,
-            client_stream: Some(client_stream),
-            parser_state: ParserState::NotStarted,
-            previous_frames: PreviousFrames::None,
+            inner: RefCell::new(AdapterInner {
+                handler: Some(handler),
+                awaiting_pong: awaiting,
+                ping_pong_promise: ping_pong_promise,
+                client_stream: Some(client_stream),
+                parser_state: ParserState::NotStarted,
+                previous_frames: PreviousFrames::None,
+            })
         }
     }
 
-    fn process_message(&mut self) -> Promise<(), Error> {
-        let frames = ::std::mem::replace(&mut self.previous_frames,
+    fn process_message(&self) -> Promise<(), Error> {
+        let mut inner = self.inner.borrow_mut();
+        let frames = ::std::mem::replace(&mut inner.previous_frames,
                                          PreviousFrames::None);
         let message = match frames {
             PreviousFrames::None => {
@@ -323,48 +330,49 @@ impl <T> Adapter<T> where T: MessageHandler {
             }
         };
 
-        match self.handler {
+        match inner.handler {
             Some(ref mut h) => h.handle_message(message),
             None => Promise::ok(()),
         }
     }
 }
 
-impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
-    fn send_bytes(&mut self,
-                  params: web_socket_stream::SendBytesParams,
-                  _results: web_socket_stream::SendBytesResults)
-                  -> Promise<(), Error>
+impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler + 'static{
+    async fn send_bytes(&self,
+                        params: web_socket_stream::SendBytesParams,
+                        _results: web_socket_stream::SendBytesResults)
+                        -> Result<(), Error>
     {
-        let message = pry!(pry!(params.get()).get_message());
+        let mut inner = self.inner.borrow_mut();
+        let message = params.get()?.get_message()?;
         let mut result_promise = Promise::ok(());
         let mut num_bytes_read = 0;
         while num_bytes_read < message.len() {
-            let (n, result) = self.parser_state.advance(&message[num_bytes_read..]);
+            let (n, result) = inner.parser_state.advance(&message[num_bytes_read..]);
             num_bytes_read += n;
             match result {
                 None => (),
                 Some(ParseResult { frame, opcode, fin }) => {
                     match opcode {
                         0x0 => { // CONTINUE
-                            match &mut self.previous_frames {
+                            match &mut inner.previous_frames {
                                 &mut PreviousFrames::None => {
-                                    return Promise::err(Error::failed(
+                                    return Err(Error::failed(
                                         format!("CONTINUE frame received, but there are no \
                                                  previous frames.")));
                                 }
                                 &mut PreviousFrames::Data(ref mut data) => {
                                     data.extend_from_slice(&frame[..]);
                                     if data.len() > (1 << 20) { // 1 MB
-                                        return Promise::err(Error::failed(
+                                        return Err(Error::failed(
                                             format!("Websocket message is too big. Please split \
                                                      the message into chunks smaller than 1MB.")));
                                     }
                                 }
                                 &mut PreviousFrames::Text(ref mut text) => {
-                                    text.push_str(&pry!(String::from_utf8(frame)));
+                                    text.push_str(&String::from_utf8(frame)?);
                                     if text.len() > (1 << 20) { // 1 MB
-                                        return Promise::err(Error::failed(
+                                        return Err(Error::failed(
                                             format!("Websocket message is too big. Please split \
                                                      the message into chunks smaller than 1MB.")));
                                     }
@@ -379,8 +387,8 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                             }
                         }
                         0x1 => { // UTF-8 PAYLOAD
-                            self.previous_frames =
-                                PreviousFrames::Text(pry!(String::from_utf8(frame)));
+                            inner.previous_frames =
+                                PreviousFrames::Text(String::from_utf8(frame)?);
 
                             if fin {
                                 let promise = self.process_message();
@@ -389,7 +397,7 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                             }
                         }
                         0x2 => { // BINARY PAYLOAD
-                            self.previous_frames = PreviousFrames::Data(frame);
+                            inner.previous_frames = PreviousFrames::Data(frame);
 
                             if fin {
                                 let promise = self.process_message();
@@ -398,12 +406,12 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                             }
                         }
                         0x8 => { // TERMINATE
-                            self.handler = None;
-                            self.ping_pong_promise = Promise::ok(());
-                            self.client_stream = None;
+                            inner.handler = None;
+                            inner.ping_pong_promise = Promise::ok(());
+                            inner.client_stream = None;
                         }
                         0x9 => { // PING
-                            match &self.client_stream {
+                            match &inner.client_stream {
                                 &None => (),
                                 &Some(ref client) => {
                                     println!("responding to ping from client");
@@ -415,7 +423,7 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
                             }
                         }
                         0xa => { // PONG
-                            self.awaiting_pong.set(false);
+                            inner.awaiting_pong.set(false);
                         }
                         _ => { // OTHER
                             println!("unrecognized websocket opcode {}", opcode);
@@ -425,6 +433,6 @@ impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler {
             }
         }
 
-        result_promise
+        result_promise.await
     }
 }
