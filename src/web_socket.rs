@@ -338,7 +338,7 @@ impl <T> Adapter<T> where T: MessageHandler {
 }
 
 impl <T> web_socket_stream::Server for Adapter<T> where T: MessageHandler + 'static{
-    async fn send_bytes(&self,
+    async fn send_bytes(self: Rc<Self>,
                         params: web_socket_stream::SendBytesParams,
                         _results: web_socket_stream::SendBytesResults)
                         -> Result<(), Error>
