@@ -23,7 +23,7 @@
     "cssnano": "^3.5.2",
     "flow-bin": "^0.22.1",
     "immutable": "3.8.1",
-    "node-sass": "^3.4.2",
+    "node-sass": "^4.14.1",
     "postcss": "^5.0.19",
     "postcss-cli": "^2.5.1",
     "react": "^15.2.1",
