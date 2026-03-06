@@ -22,7 +22,7 @@
     "browserify": "^13.3.0",
     "cssnano": "^3.5.2",
     "flow-bin": "^0.22.1",
-    "immutable": "3.8.1",
+    "immutable": "3.8.3",
     "node-sass": "^3.4.2",
     "postcss": "^5.0.19",
     "postcss-cli": "^2.5.1",
